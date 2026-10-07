@@ -121,7 +121,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const gantiCara = filteredRecords.filter((r) => r.participantStatus === 'GANTI_CARA').length;
     const ulangan = filteredRecords.filter((r) => r.participantStatus === 'ULANGAN').length; // Ulangan dipisah
     const apbn = filteredRecords.filter((r) => r.alokonSource === 'APBN').length;
-    const mandiri = filteredRecords.filter((r) => r.alokonSource !== 'APBN').length;
+    const apbd = filteredRecords.filter((r) => r.alokonSource === 'NON_APBN').length;
+    const mandiri = filteredRecords.filter((r) => r.alokonSource === 'MANDIRI').length;
 
     return {
       total,
@@ -132,6 +133,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       gantiCara,
       ulangan,
       apbn,
+      apbd,
       mandiri,
     };
   }, [filteredRecords]);
@@ -158,7 +160,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const gantiCara = recs.filter((r) => r.participantStatus === 'GANTI_CARA').length;
       const ulangan = recs.filter((r) => r.participantStatus === 'ULANGAN').length; // Ulangan
       const apbn = recs.filter((r) => r.alokonSource === 'APBN').length;
-      const mandiri = recs.filter((r) => r.alokonSource !== 'APBN').length;
+      const apbd = recs.filter((r) => r.alokonSource === 'NON_APBN').length;
+      const mandiri = recs.filter((r) => r.alokonSource === 'MANDIRI').length;
 
       return {
         key: m,
@@ -171,6 +174,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         gantiCara,
         ulangan,
         apbn,
+        apbd,
         mandiri,
       };
     });
@@ -606,12 +610,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* METRIK ALOKON (SUMBER LOGISTIK) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* METRIK ALOKON (SUMBER LOGISTIK: APBN, APBD, MANDIRI) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-white px-5 py-4 rounded-2xl border border-slate-200/80 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-slate-800">Alokon Pemerintah (APBN)</span>
-            <p className="text-[11px] text-slate-500 mt-0.5">Logistik program BKKBN bagi masyarakat</p>
+            <span className="text-xs font-semibold text-slate-800">Alokon APBN</span>
+            <p className="text-[11px] text-slate-500 mt-0.5">Logistik program BKKBN pusat</p>
           </div>
           <div className="text-right">
             <span className="text-xl font-bold text-slate-900 font-mono tabular-nums">{stats.apbn}</span>
@@ -621,7 +625,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         <div className="bg-white px-5 py-4 rounded-2xl border border-slate-200/80 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-slate-800">Alokon Mandiri / Non-APBN</span>
+            <span className="text-xs font-semibold text-slate-800">Alokon APBD</span>
+            <p className="text-[11px] text-slate-500 mt-0.5">Logistik pengadaan pemerintah daerah</p>
+          </div>
+          <div className="text-right">
+            <span className="text-xl font-bold text-slate-900 font-mono tabular-nums">{stats.apbd}</span>
+            <span className="text-[11px] text-slate-400 block">Akseptor</span>
+          </div>
+        </div>
+
+        <div className="bg-white px-5 py-4 rounded-2xl border border-slate-200/80 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-semibold text-slate-800">Alokon Mandiri</span>
             <p className="text-[11px] text-slate-500 mt-0.5">Pengadaan mandiri atau mitra faskes</p>
           </div>
           <div className="text-right">
@@ -676,6 +691,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   Total Layanan
                 </th>
                 <th className="border border-slate-300 p-2 w-16 text-purple-900 bg-purple-50">APBN</th>
+                <th className="border border-slate-300 p-2 w-16 text-indigo-900 bg-indigo-50">APBD</th>
                 <th className="border border-slate-300 p-2 w-16 bg-slate-50">Mandiri</th>
               </tr>
             </thead>
@@ -715,6 +731,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     {row.total}
                   </td>
                   <td className="border border-slate-300 p-2 text-purple-900 font-semibold">{row.apbn}</td>
+                  <td className="border border-slate-300 p-2 text-indigo-900 font-semibold">{row.apbd}</td>
                   <td className="border border-slate-300 p-2 text-slate-600">{row.mandiri}</td>
                 </tr>
               ))}
@@ -737,6 +754,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   {stats.total}
                 </td>
                 <td className="border border-slate-300 p-2 font-mono text-purple-950">{stats.apbn}</td>
+                <td className="border border-slate-300 p-2 font-mono text-indigo-950">{stats.apbd}</td>
                 <td className="border border-slate-300 p-2 font-mono text-slate-800">{stats.mandiri}</td>
               </tr>
             </tfoot>
