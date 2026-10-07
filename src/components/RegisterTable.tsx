@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ContraceptiveMethod, FacilityProfile, PatientRecord, User, Village } from '../types';
+import { FacilityProfile, PatientRecord, User, Village } from '../types';
 import {
   METHOD_SHORT_LABELS,
-  STATUS_LABELS,
-  ACTION_LABELS,
-  ALOKON_LABELS,
+  ALOKON_KODE_OPTIONS,
+  STATUS_PESERTA_KODE_LABELS,
+  deriveR1KBRow,
 } from '../data/initialData';
 import {
   Search,
@@ -14,13 +14,8 @@ import {
   Eye,
   Edit2,
   Trash2,
-  Calendar,
   X,
-  Stethoscope,
   UserCheck,
-  Heart,
-  FileSpreadsheet,
-  Sparkles,
 } from 'lucide-react';
 
 interface RegisterTableProps {
@@ -48,6 +43,12 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
 }) => {
   const isUserDesa =
     currentUser?.role === 'admin_desa' || currentUser?.role === 'bidan_desa';
+  const isAdminKecamatan = currentUser?.role === 'admin_kecamatan';
+  const isAdminInduk =
+    currentUser?.role === 'admin_induk' ||
+    currentUser?.role === 'admin_kabupaten' ||
+    !currentUser;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVillage, setSelectedVillage] = useState<string>(
     isUserDesa && currentUser?.village ? currentUser.village : 'SEMUA'
@@ -58,9 +59,8 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
   const [selectedYear, setSelectedYear] = useState<number>(2026);
 
   const [detailRecord, setDetailRecord] = useState<PatientRecord | null>(null);
-  const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('cards');
+  const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('table');
 
-  // Otomatis sinkronkan filter wilayah saat berganti akun
   useEffect(() => {
     if (isUserDesa && currentUser?.village) {
       setSelectedVillage(currentUser.village);
@@ -70,14 +70,26 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
   }, [currentUser, isUserDesa]);
 
   const monthNames = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
   ];
 
-  // Filter records
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
-      if (selectedVillage !== 'SEMUA' && r.village.toLowerCase() !== selectedVillage.toLowerCase()) {
+      if (
+        selectedVillage !== 'SEMUA' &&
+        r.village.toLowerCase() !== selectedVillage.toLowerCase()
+      ) {
         return false;
       }
       if (selectedMethod !== 'SEMUA' && r.method !== selectedMethod) {
@@ -93,128 +105,73 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
       }
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
-        const matchName = r.wifeName.toLowerCase().includes(q) || (r.husbandName && r.husbandName.toLowerCase().includes(q));
-        const matchNik = (r.wifeNik && r.wifeNik.includes(q)) || (r.husbandNik && r.husbandNik.includes(q));
-        const matchReg = r.registerNumber.toLowerCase().includes(q);
+        const matchName =
+          r.wifeName.toLowerCase().includes(q) ||
+          (r.husbandName && r.husbandName.toLowerCase().includes(q));
+        const matchNik =
+          (r.wifeNik && r.wifeNik.includes(q)) ||
+          (r.husbandNik && r.husbandNik.includes(q));
         const matchAddr = r.address && r.address.toLowerCase().includes(q);
-        if (!matchName && !matchNik && !matchReg && !matchAddr) return false;
+        if (!matchName && !matchNik && !matchAddr) return false;
       }
       return true;
     });
-  }, [records, selectedVillage, selectedMethod, selectedStatus, selectedMonth, selectedYear, searchTerm]);
+  }, [
+    records,
+    selectedVillage,
+    selectedMethod,
+    selectedStatus,
+    selectedMonth,
+    selectedYear,
+    searchTerm,
+  ]);
 
-  // Aggregate summaries for bottom row
-  const summary = useMemo(() => {
-    let totalAnakL = 0;
-    let totalAnakP = 0;
-    let totalBaru = 0;
-    let totalKbpp = 0;
-    let totalGantiCara = 0;
-    let totalUlangan = 0;
-    let totalApbn = 0;
-    let totalMandiri = 0;
+  const faskesDisplayName =
+    selectedVillage !== 'SEMUA'
+      ? `Pustu ${selectedVillage}`
+      : isUserDesa && currentUser?.village
+      ? `Pustu ${currentUser.village}`
+      : facility.name;
 
-    filteredRecords.forEach((r) => {
-      totalAnakL += r.aliveChildrenMale || 0;
-      totalAnakP += r.aliveChildrenFemale || 0;
-      if (r.participantStatus === 'BARU_PASCA_SALIN') {
-        totalKbpp += 1;
-      } else if (r.participantStatus === 'BARU_BUKAN_PASCA' || r.participantStatus === 'BARU_PASCA_GUGUR') {
-        totalBaru += 1;
-      } else if (r.participantStatus === 'GANTI_CARA') {
-        totalGantiCara += 1;
-      } else if (r.participantStatus === 'ULANGAN') {
-        totalUlangan += 1;
-      }
-
-      if (r.alokonSource === 'APBN') {
-        totalApbn += 1;
-      } else {
-        totalMandiri += 1;
-      }
-    });
-
-    return {
-      total: filteredRecords.length,
-      totalAnakL,
-      totalAnakP,
-      totalBaru,
-      totalKbpp,
-      totalGantiCara,
-      totalUlangan,
-      totalApbn,
-      totalMandiri,
-    };
-  }, [filteredRecords]);
-
-  const getStatusLabelPlain = (status: string) => {
-    switch (status) {
-      case 'BARU_PASCA_SALIN':
-        return 'KBPP';
-      case 'BARU_BUKAN_PASCA':
-        return 'Baru';
-      case 'BARU_PASCA_GUGUR':
-        return 'Pasca Gugur';
-      case 'GANTI_CARA':
-        return 'Ganti Cara';
-      case 'ULANGAN':
-        return 'Ulangan';
-      default:
-        return status;
-    }
-  };
-
-  // Download Excel dengan tampilan dan struktur tabel sama persis seperti di aplikasi
+  // Download Excel persis format 24 Kolom R/I/KB/20
   const handleDownloadExcel = () => {
-    const periodLabel = `${selectedMonth > 0 ? monthNames[selectedMonth - 1].toUpperCase() : 'SEMUA BULAN'} ${selectedYear || 'SEMUA TAHUN'}`;
-    const regionLabel = selectedVillage === 'SEMUA' ? 'SELURUH DESA' : `DESA ${selectedVillage.toUpperCase()}`;
-
+    const activeMonth = selectedMonth > 0 ? selectedMonth : 9;
     const rowsHtml = filteredRecords
       .map((r, index) => {
-        const bgRow = index % 2 === 1 ? '#f8fafc' : '#ffffff';
-        const statusText = getStatusLabelPlain(r.participantStatus);
-        const statusBg =
-          r.participantStatus === 'BARU_PASCA_SALIN'
-            ? '#d1fae5'
-            : r.participantStatus === 'BARU_BUKAN_PASCA'
-            ? '#ccfbf1'
-            : r.participantStatus === 'GANTI_CARA'
-            ? '#fef3c7'
-            : r.participantStatus === 'ULANGAN'
-            ? '#dbeafe'
-            : '#f1f5f9';
-        const sideEffectText =
-          r.complications && r.complications !== 'Tidak Ada'
-            ? r.complications
-            : r.sideEffects && r.sideEffects !== 'Tidak Ada'
-            ? r.sideEffects
-            : '-';
+        const d = deriveR1KBRow(r);
+        const nikCells = d.nikDigits
+          .map(
+            (digit) =>
+              `<td style="border:1px solid #000000; padding:3px 2px; text-align:center; font-family:Arial,sans-serif; font-size:8.5pt; width:16px;">${digit}</td>`
+          )
+          .join('');
 
         return `
-          <tr style="background-color:${bgRow};">
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-family:Consolas,monospace; font-weight:bold;">${index + 1}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-family:Consolas,monospace; mso-number-format:'\\@';">${r.serviceDate || '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-family:Consolas,monospace; font-weight:bold; mso-number-format:'\\@';">${r.registerNumber || '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; font-family:Consolas,monospace; font-weight:bold; mso-number-format:'\\@';">${r.wifeNik || '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; font-weight:bold;">${r.wifeName || '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-family:Consolas,monospace;">${r.wifeAge}</td>
-            <td style="border:1px solid #475569; padding:5px;">${r.husbandName || '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; font-family:Consolas,monospace; mso-number-format:'\\@';">${r.husbandNik || '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; font-weight:600;">Desa ${r.village}</td>
-            <td style="border:1px solid #475569; padding:5px;">${r.address || '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-family:Consolas,monospace; font-weight:bold;">${r.aliveChildrenMale}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-family:Consolas,monospace; font-weight:bold;">${r.aliveChildrenFemale}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-family:Consolas,monospace;">${r.youngestChildAgeMonths > 0 ? `${r.youngestChildAgeMonths} bln` : '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-weight:bold; background-color:${statusBg};">${statusText}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-weight:bold; color:#064e3b;">${METHOD_SHORT_LABELS[r.method] || r.method}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-weight:bold;">${r.alokonSource}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center;">${ACTION_LABELS[r.actionType] || r.actionType}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-family:Consolas,monospace; mso-number-format:'\\@';">${r.bloodPressure || '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-family:Consolas,monospace;">${r.weightKg > 0 ? r.weightKg : '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center; font-family:Consolas,monospace; mso-number-format:'\\@';">${r.hpht || '-'}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center;">${sideEffectText}</td>
-            <td style="border:1px solid #475569; padding:5px; text-align:center;">${r.referralStatus === 'TIDAK' ? 'Tidak' : 'Rujuk'}</td>
-            <td style="border:1px solid #475569; padding:5px;">${r.officerName || '-'}</td>
+          <tr>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${index + 1}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center; white-space:nowrap;">${d.tanggalFormatted}</td>
+            <td style="border:1px solid #000000; padding:4px;">${d.husbandName}</td>
+            ${nikCells}
+            <td style="border:1px solid #000000; padding:4px;">${d.wifeName}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center; white-space:nowrap;">${d.wifeDobFormatted}</td>
+            <td style="border:1px solid #000000; padding:4px;">${d.alamat}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center; mso-number-format:'\\@';">${d.phone}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col9}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col10}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col11}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col12}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col13}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col14}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col15}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col16}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col17}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col18}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col19}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col20}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col21}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col22}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col23}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col24}</td>
           </tr>
         `;
       })
@@ -229,7 +186,7 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
           <x:ExcelWorkbook>
             <x:ExcelWorksheets>
               <x:ExcelWorksheet>
-                <x:Name>Register Pelayanan KB</x:Name>
+                <x:Name>REGISTER PELAYANAN KB</x:Name>
                 <x:WorksheetOptions>
                   <x:DisplayGridlines/>
                 </x:WorksheetOptions>
@@ -239,114 +196,95 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
         </xml>
         <![endif]-->
       </head>
-      <body style="font-family:Arial,sans-serif; font-size:10pt; color:#0f172a;">
-        <table style="border-collapse:collapse; width:100%;">
+      <body style="font-family:Arial,sans-serif; font-size:9pt; color:#000000;">
+        <table style="border-collapse:collapse; width:100%; margin-bottom:8px;">
           <tr>
-            <td colspan="10" style="font-family:Consolas,monospace; font-size:9pt; font-weight:bold; padding:2px;">
-              KODE REGISTER: ${facility.k0kbCode} &bull; FORMULIR R/I/KB
-            </td>
-            <td colspan="13" style="font-family:Consolas,monospace; font-size:9pt; font-weight:bold; text-align:right; padding:2px;">
-              PROVINSI: ${facility.province.toUpperCase()} &bull; KABUPATEN: ${facility.regency.toUpperCase()} &bull; KECAMATAN: ${facility.district.toUpperCase()}
-            </td>
+            <td colspan="4" style="border:1px solid #000; padding:4px; font-size:8.5pt;">1. Petugas Entri Data</td>
+            <td colspan="28" style="text-align:center; font-size:14pt; font-weight:bold;">REGISTER PELAYANAN KB</td>
+            <td colspan="3" style="background-color:#000; color:#fff; text-align:center; font-weight:bold; padding:4px;">R/I/KB/20</td>
+            <td colspan="4" style="text-align:right; font-size:8.5pt;">Lembar <u>&nbsp;1&nbsp;</u></td>
           </tr>
           <tr>
-            <td colspan="23" style="text-align:center; font-size:13pt; font-weight:bold; padding-top:6px;">
-              REGISTER PELAYANAN KELUARGA BERENCANA FASILITAS KESEHATAN
+            <td colspan="6" style="font-size:9pt; padding-top:6px;">
+              NAMA FASKES/JARINGAN/JEJARING : <u>${faskesDisplayName}</u>
             </td>
-          </tr>
-          <tr>
-            <td colspan="23" style="text-align:center; font-size:11pt; font-weight:bold;">
-              ${facility.name.toUpperCase()}
+            <td colspan="24" style="text-align:center; font-size:9pt; padding-top:6px;">
+              Kode Provinsi: <b>35</b> &nbsp;|&nbsp; Kode Kab/Kota: <b>22</b> &nbsp;|&nbsp; No. Register Faskes: <b>004</b> &nbsp;|&nbsp; No. Jaringan: <b>02</b>
             </td>
-          </tr>
-          <tr>
-            <td colspan="23" style="text-align:center; font-size:9.5pt; font-weight:bold; padding-bottom:10px;">
-              PERIODE LAPORAN: ${periodLabel} &bull; CAKUPAN WILAYAH: ${regionLabel}
+            <td colspan="9" style="text-align:right; font-size:9pt; padding-top:6px;">
+              Bulan: <b>${selectedMonth > 0 ? monthNames[activeMonth - 1] : 'Semua'}</b> &nbsp; Tahun: <b>${selectedYear || 2026}</b>
             </td>
           </tr>
         </table>
 
-        <table style="border-collapse:collapse; width:100%; font-size:9.5pt;">
+        <table style="border-collapse:collapse; width:100%; font-size:8.5pt;">
           <thead>
-            <tr style="background-color:#e2e8f0; text-align:center; font-weight:bold;">
-              <th rowspan="2" style="border:1px solid #334155; padding:6px;">NO</th>
-              <th rowspan="2" style="border:1px solid #334155; padding:6px;">TANGGAL PELAYANAN</th>
-              <th rowspan="2" style="border:1px solid #334155; padding:6px;">NO. REGISTER / SERI KARTU</th>
-              <th colspan="3" style="border:1px solid #334155; padding:6px; background-color:#d1fae5; color:#022c22;">IDENTITAS PESERTA KB (ISTRI)</th>
-              <th colspan="2" style="border:1px solid #334155; padding:6px; background-color:#ccfbf1; color:#042f2e;">IDENTITAS SUAMI</th>
-              <th colspan="2" style="border:1px solid #334155; padding:6px; background-color:#e0f2fe; color:#082f49;">ALAMAT DOMISILI</th>
-              <th colspan="2" style="border:1px solid #334155; padding:6px; background-color:#dbeafe; color:#172554;">JUMLAH ANAK HIDUP</th>
-              <th rowspan="2" style="border:1px solid #334155; padding:6px; background-color:#eff6ff;">UMUR ANAK TERKECIL</th>
-              <th rowspan="2" style="border:1px solid #334155; padding:6px; background-color:#fef3c7; color:#451a03;">STATUS PESERTA KB</th>
-              <th rowspan="2" style="border:1px solid #334155; padding:6px; background-color:#d1fae5; color:#022c22;">METODE KONTRASEPSI</th>
-              <th rowspan="2" style="border:1px solid #334155; padding:6px; background-color:#f3e8ff; color:#3b0764;">SUMBER ALOKON</th>
-              <th rowspan="2" style="border:1px solid #334155; padding:6px; background-color:#e0e7ff; color:#1e1b4b;">JENIS TINDAKAN</th>
-              <th colspan="3" style="border:1px solid #334155; padding:6px; background-color:#ffe4e6; color:#4c0519;">PENAPISAN / PEMERIKSAAN MEDIS</th>
-              <th rowspan="2" style="border:1px solid #334155; padding:6px; background-color:#fff1f2;">EFEK SAMPING / KOMPLIKASI</th>
-              <th rowspan="2" style="border:1px solid #334155; padding:6px;">RUJUKAN</th>
-              <th rowspan="2" style="border:1px solid #334155; padding:6px;">PEMBERI PELAYANAN / PETUGAS</th>
+            <tr style="text-align:center; font-weight:bold;">
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">NO.</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">TANGGAL</th>
+              <th colspan="21" style="border:1px solid #000000; padding:4px;">PESERTA KB</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">STATUS PESERTA KB (Kode)</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">INFORMED CONSENT</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PASCA PERSALINAN</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PASCA KEGUGURAN</th>
+              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">JENIS TINDAKAN (Kode)</th>
+              <th colspan="2" rowspan="2" style="border:1px solid #000000; padding:4px;">Kasus (Kode)</th>
+              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">PENGGUNAAN ASURANSI</th>
+              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">SUMBER ALOKON</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PELAYANAN BERGERAK</th>
             </tr>
-            <tr style="background-color:#f1f5f9; text-align:center; font-weight:bold; font-size:9pt;">
-              <th style="border:1px solid #334155; padding:5px; background-color:#ecfdf5;">NIK Istri (16 Digit)</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#ecfdf5;">Nama Lengkap Istri</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#ecfdf5;">Umur (Thn)</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#f0fdfa;">Nama Suami</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#f0fdfa;">NIK Suami</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#f0f9ff;">Desa / Kel.</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#f0f9ff;">RT/RW / Alamat</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#eff6ff;">L</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#eff6ff;">P</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#fff1f2;">TD (mmHg)</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#fff1f2;">BB (kg)</th>
-              <th style="border:1px solid #334155; padding:5px; background-color:#fff1f2;">HPHT</th>
+            <tr style="text-align:center; font-weight:bold;">
+              <th rowspan="2" style="border:1px solid #000000; padding:4px;">NAMA SUAMI</th>
+              <th colspan="18" style="border:1px solid #000000; padding:4px;">ISTRI</th>
+              <th rowspan="2" style="border:1px solid #000000; padding:4px;">ALAMAT</th>
+              <th rowspan="2" style="border:1px solid #000000; padding:4px;">NO. HANDPHONE</th>
             </tr>
-            <tr style="background-color:#f8fafc; text-align:center; font-family:Consolas,monospace; font-size:8.5pt; color:#475569;">
-              <th style="border:1px solid #334155; padding:3px;">(1)</th>
-              <th style="border:1px solid #334155; padding:3px;">(2)</th>
-              <th style="border:1px solid #334155; padding:3px;">(3)</th>
-              <th style="border:1px solid #334155; padding:3px;">(4)</th>
-              <th style="border:1px solid #334155; padding:3px;">(5)</th>
-              <th style="border:1px solid #334155; padding:3px;">(6)</th>
-              <th style="border:1px solid #334155; padding:3px;">(7)</th>
-              <th style="border:1px solid #334155; padding:3px;">(8)</th>
-              <th style="border:1px solid #334155; padding:3px;">(9)</th>
-              <th style="border:1px solid #334155; padding:3px;">(10)</th>
-              <th style="border:1px solid #334155; padding:3px;">(11)</th>
-              <th style="border:1px solid #334155; padding:3px;">(12)</th>
-              <th style="border:1px solid #334155; padding:3px;">(13)</th>
-              <th style="border:1px solid #334155; padding:3px;">(14)</th>
-              <th style="border:1px solid #334155; padding:3px;">(15)</th>
-              <th style="border:1px solid #334155; padding:3px;">(16)</th>
-              <th style="border:1px solid #334155; padding:3px;">(17)</th>
-              <th style="border:1px solid #334155; padding:3px;">(18)</th>
-              <th style="border:1px solid #334155; padding:3px;">(19)</th>
-              <th style="border:1px solid #334155; padding:3px;">(20)</th>
-              <th style="border:1px solid #334155; padding:3px;">(21)</th>
-              <th style="border:1px solid #334155; padding:3px;">(22)</th>
-              <th style="border:1px solid #334155; padding:3px;">(23)</th>
+            <tr style="text-align:center; font-weight:bold;">
+              <th colspan="16" style="border:1px solid #000000; padding:4px;">NIK (NOMOR INDUK KEPENDUDUKAN)</th>
+              <th style="border:1px solid #000000; padding:4px;">NAMA</th>
+              <th style="border:1px solid #000000; padding:4px;">TANGGAL LAHIR</th>
+              <th style="border:1px solid #000000; padding:4px;">OPERATIF / PEMBERIAN / PEMASANGAN</th>
+              <th style="border:1px solid #000000; padding:4px;">PENCABUTAN DAN PEMASANGAN</th>
+              <th style="border:1px solid #000000; padding:4px;">PENCABUTAN</th>
+              <th style="border:1px solid #000000; padding:4px;">KOMPLIKASI BERAT</th>
+              <th style="border:1px solid #000000; padding:4px;">KEGAGALAN</th>
+              <th style="border:1px solid #000000; padding:4px;">BPJS KESEHATAN</th>
+              <th style="border:1px solid #000000; padding:4px;">LAINNYA</th>
+              <th style="border:1px solid #000000; padding:4px;">TIDAK</th>
+              <th style="border:1px solid #000000; padding:4px;">APBN</th>
+              <th style="border:1px solid #000000; padding:4px;">APBD</th>
+              <th style="border:1px solid #000000; padding:4px;">MANDIRI</th>
+            </tr>
+            <tr style="text-align:center; font-size:8pt;">
+              <th style="border:1px solid #000000; padding:2px;">1</th>
+              <th style="border:1px solid #000000; padding:2px;">2</th>
+              <th style="border:1px solid #000000; padding:2px;">3</th>
+              <th colspan="16" style="border:1px solid #000000; padding:2px;">4</th>
+              <th style="border:1px solid #000000; padding:2px;">5</th>
+              <th style="border:1px solid #000000; padding:2px;">6</th>
+              <th style="border:1px solid #000000; padding:2px;">7</th>
+              <th style="border:1px solid #000000; padding:2px;">8</th>
+              <th style="border:1px solid #000000; padding:2px;">9</th>
+              <th style="border:1px solid #000000; padding:2px;">10</th>
+              <th style="border:1px solid #000000; padding:2px;">11</th>
+              <th style="border:1px solid #000000; padding:2px;">12</th>
+              <th style="border:1px solid #000000; padding:2px;">13</th>
+              <th style="border:1px solid #000000; padding:2px;">14</th>
+              <th style="border:1px solid #000000; padding:2px;">15</th>
+              <th style="border:1px solid #000000; padding:2px;">16</th>
+              <th style="border:1px solid #000000; padding:2px;">17</th>
+              <th style="border:1px solid #000000; padding:2px;">18</th>
+              <th style="border:1px solid #000000; padding:2px;">19</th>
+              <th style="border:1px solid #000000; padding:2px;">20</th>
+              <th style="border:1px solid #000000; padding:2px;">21</th>
+              <th style="border:1px solid #000000; padding:2px;">22</th>
+              <th style="border:1px solid #000000; padding:2px;">23</th>
+              <th style="border:1px solid #000000; padding:2px;">24</th>
             </tr>
           </thead>
           <tbody>
             ${rowsHtml}
           </tbody>
-          <tfoot>
-            <tr style="background-color:#e2e8f0; font-weight:bold; text-align:center;">
-              <td colspan="10" style="border:1px solid #334155; padding:6px; text-align:right;">
-                JUMLAH / TOTAL TERLAYANI (${summary.total} PASIEN) :
-              </td>
-              <td style="border:1px solid #334155; padding:6px; font-family:Consolas,monospace;">${summary.totalAnakL}</td>
-              <td style="border:1px solid #334155; padding:6px; font-family:Consolas,monospace;">${summary.totalAnakP}</td>
-              <td style="border:1px solid #334155; padding:6px;">-</td>
-              <td style="border:1px solid #334155; padding:6px;">
-                Baru: ${summary.totalBaru} | KBPP: ${summary.totalKbpp} | Ganti: ${summary.totalGantiCara} | Ulang: ${summary.totalUlangan}
-              </td>
-              <td style="border:1px solid #334155; padding:6px; color:#064e3b;">${summary.total} Akseptor</td>
-              <td style="border:1px solid #334155; padding:6px;">APBN: ${summary.totalApbn}</td>
-              <td colspan="7" style="border:1px solid #334155; padding:6px; text-align:left; color:#475569;">
-                Kondisi: Terdata Lengkap
-              </td>
-            </tr>
-          </tfoot>
         </table>
       </body>
       </html>
@@ -359,157 +297,100 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
     const link = document.createElement('a');
     link.href = url;
     const monthStr = selectedMonth > 0 ? monthNames[selectedMonth - 1] : 'Semua_Bulan';
-    link.download = `Register_Pelayanan_KB_${monthStr}_${selectedYear || 'Semua'}.xls`;
+    link.download = `Register_RIKB20_${monthStr}_${selectedYear || 'Semua'}.xls`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'BARU_PASCA_SALIN':
-        return (
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
-            KBPP
-          </span>
-        );
-      case 'BARU_BUKAN_PASCA':
-        return (
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-300">
-            Baru
-          </span>
-        );
-      case 'BARU_PASCA_GUGUR':
-        return (
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-300">
-            Pasca Gugur
-          </span>
-        );
-      case 'GANTI_CARA':
-        return (
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-            Ganti Cara
-          </span>
-        );
-      case 'ULANGAN':
-        return (
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-300">
-            Ulangan
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700">
-            {status}
-          </span>
-        );
-    }
-  };
-
-    const isBidanDesa = currentUser?.role === 'admin_desa' || currentUser?.role === 'bidan_desa';
-    const isAdminKecamatan = currentUser?.role === 'admin_kecamatan';
-    const isAdminInduk = currentUser?.role === 'admin_induk' || currentUser?.role === 'admin_kabupaten' || !currentUser;
-
-    return (
-      <div className="space-y-4">
-        {/* Top Action Toolbar */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mb-0.5">
-              <span className="text-emerald-700 font-semibold">
-                {isAdminInduk
-                  ? `Admin Induk Dinas P3AKB${currentUser?.district ? ` · Kec. ${currentUser.district}` : ''}`
-                  : isAdminKecamatan
-                  ? `Admin Kecamatan ${currentUser?.district || facility.district}`
-                  : `Admin Desa ${currentUser?.village || ''}`}
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>Formulir R/I/KB</span>
-            </div>
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-              {isBidanDesa
-                ? `Register Pelayanan KB Desa ${currentUser?.village || ''}`
+  return (
+    <div className="space-y-4">
+      {/* Top Action Toolbar */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mb-0.5">
+            <span className="text-emerald-700 font-semibold">
+              {isAdminInduk
+                ? `Admin Induk Dinas P3AKB${currentUser?.district ? ` · Kec. ${currentUser.district}` : ''}`
                 : isAdminKecamatan
-                ? `Register Pelayanan KB Kecamatan ${facility.district}`
-                : 'Register Pelayanan KB Kabupaten Bojonegoro'}
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {isBidanDesa
-                ? `Pencatatan akseptor KB wilayah Desa ${currentUser?.village || ''}`
-                : isAdminKecamatan
-                ? `Supervisi data pelayanan KB seluruh desa di Kecamatan ${facility.district}`
-                : 'Basis data terpadu pelayanan KB Dinas P3AKB Kabupaten Bojonegoro'}
-            </p>
+                ? `Admin Kecamatan ${currentUser?.district || facility.district}`
+                : `Admin Desa ${currentUser?.village || ''}`}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span className="font-mono font-bold text-slate-900">R/I/KB/20</span>
           </div>
-
-          {/* Action Buttons */}
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
-            {/* Add New Record - Full width primary CTA on mobile */}
-            <button
-              onClick={onAddNew}
-              className={`col-span-2 sm:order-3 inline-flex items-center justify-center space-x-2 px-4 py-3 sm:py-2 text-xs sm:text-xs font-bold text-white rounded-xl shadow-sm transition active:scale-98 cursor-pointer ${
-                isBidanDesa
-                  ? 'bg-emerald-600 hover:bg-emerald-700 ring-2 ring-emerald-400/50'
-                  : 'bg-emerald-600 hover:bg-emerald-700'
-              }`}
-            >
-              <Plus className="w-4 h-4" />
-              <span>{isBidanDesa ? `+ Entri Pasien Desa ${currentUser?.village || ''}` : '+ Entri Pasien KB Baru'}</span>
-            </button>
-
-            {/* Print/PDF */}
-            <button
-              onClick={onOpenPrint}
-              className="sm:order-1 inline-flex items-center justify-center space-x-1.5 px-3 py-2.5 sm:py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition shadow-2xs cursor-pointer active:scale-95"
-              title="Cetak atau Simpan PDF format landscape resmi BKKBN"
-            >
-              <Printer className="w-4 h-4 text-slate-600" />
-              <span>Cetak / PDF</span>
-            </button>
-
-            {/* Download Excel */}
-            <button
-              onClick={handleDownloadExcel}
-              className="sm:order-2 inline-flex items-center justify-center space-x-1.5 px-3 py-2.5 sm:py-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 rounded-xl transition shadow-2xs cursor-pointer active:scale-95"
-              title="Download tabel ke format Microsoft Excel (.xls) persis seperti di aplikasi"
-            >
-              <Download className="w-4 h-4 text-emerald-600" />
-              <span>Unduh Excel</span>
-            </button>
-
-            {/* Clear records button (Hanya Admin Induk) */}
-            {isAdminInduk && records.length > 0 && onClearRecords && (
-              <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      'PERINGATAN: Apakah Anda yakin ingin mengosongkan seluruh data register pelayanan KB? Seluruh data pasien akan dihapus menjadi 0 data.'
-                    )
-                  ) {
-                    onClearRecords();
-                  }
-                }}
-                className="col-span-2 sm:order-4 inline-flex items-center justify-center space-x-1 px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer"
-                title="Kosongkan seluruh data register"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                <span>Kosongkan</span>
-              </button>
-            )}
-          </div>
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+            {isUserDesa
+              ? `Register Pelayanan KB Desa ${currentUser?.village || ''}`
+              : isAdminKecamatan
+              ? `Register Pelayanan KB Kecamatan ${facility.district}`
+              : 'Register Pelayanan KB Kabupaten Bojonegoro'}
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Formulir Register Pelayanan KB Resmi BKKBN (24 Kolom Standar R/I/KB/20)
+          </p>
         </div>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={onAddNew}
+            className="col-span-2 sm:order-3 inline-flex items-center justify-center space-x-2 px-4 py-3 sm:py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition active:scale-98 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>
+              {isUserDesa
+                ? `+ Entri Pasien Desa ${currentUser?.village || ''}`
+                : '+ Entri Register R/I/KB'}
+            </span>
+          </button>
+
+          <button
+            onClick={onOpenPrint}
+            className="sm:order-1 inline-flex items-center justify-center space-x-1.5 px-3 py-2.5 sm:py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition shadow-2xs cursor-pointer active:scale-95"
+          >
+            <Printer className="w-4 h-4 text-slate-600" />
+            <span>Cetak / PDF</span>
+          </button>
+
+          <button
+            onClick={handleDownloadExcel}
+            className="sm:order-2 inline-flex items-center justify-center space-x-1.5 px-3 py-2.5 sm:py-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 rounded-xl transition shadow-2xs cursor-pointer active:scale-95"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            <span>Unduh Excel</span>
+          </button>
+
+          {isAdminInduk && records.length > 0 && onClearRecords && (
+            <button
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'PERINGATAN: Apakah Anda yakin ingin mengosongkan seluruh data register pelayanan KB?'
+                  )
+                ) {
+                  onClearRecords();
+                }
+              }}
+              className="col-span-2 sm:order-4 inline-flex items-center justify-center space-x-1 px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Kosongkan</span>
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-2.5">
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-2">
-          {/* Search Box */}
           <div className="col-span-2 lg:col-span-2 relative">
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari Nama Istri, Suami, NIK 16 digit..."
+              placeholder="Cari Nama Suami, Nama Istri, NIK 16 digit, Alamat..."
               className="w-full pl-9 pr-8 py-2.5 sm:py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
             />
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3 sm:top-2.5" />
@@ -523,12 +404,11 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
             )}
           </div>
 
-          {/* Filter Bulan */}
           <div>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+              className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none font-medium"
             >
               <option value={0}>Semua Bulan</option>
               {monthNames.map((name, idx) => (
@@ -539,12 +419,11 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
             </select>
           </div>
 
-          {/* Filter Tahun */}
           <div>
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+              className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none font-medium"
             >
               <option value={0}>Semua Tahun</option>
               <option value={2026}>Tahun 2026</option>
@@ -553,13 +432,12 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
             </select>
           </div>
 
-          {/* Filter Desa */}
           <div>
             <select
               value={selectedVillage}
               onChange={(e) => setSelectedVillage(e.target.value)}
               disabled={isUserDesa}
-              className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 disabled:opacity-75"
+              className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none disabled:opacity-75"
             >
               {!isUserDesa && <option value="SEMUA">Semua Desa</option>}
               {villages.map((v) => (
@@ -570,17 +448,16 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
             </select>
           </div>
 
-          {/* Filter Metode KB (termasuk MOW dan MOP) */}
           <div>
             <select
               value={selectedMethod}
               onChange={(e) => setSelectedMethod(e.target.value)}
-              className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
             >
               <option value="SEMUA">Semua Metode KB</option>
               {Object.entries(METHOD_SHORT_LABELS).map(([k, label]) => (
                 <option key={k} value={k}>
-                  {label}
+                  Metode: {label}
                 </option>
               ))}
             </select>
@@ -588,31 +465,31 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
         </div>
       </div>
 
-      {/* EMPTY STATE */}
+      {/* Empty State */}
       {filteredRecords.length === 0 && (
-        <div className="bg-white p-8 sm:p-12 rounded-2xl border border-slate-200 shadow-xs text-center">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3">
-            <UserCheck className="w-7 h-7" />
+        <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-12 text-center shadow-xs my-4">
+          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-200">
+            <Plus className="w-8 h-8" />
           </div>
-          <h3 className="text-base font-bold text-slate-800">Tidak Ada Data Pasien</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-5">
+          <h3 className="text-base font-bold text-slate-900 mb-1">
             {records.length === 0
-              ? 'Daftar register saat ini masih kosong (0 data). Silakan klik tombol di bawah untuk memulai entri data akseptor baru.'
-              : `Tidak ada data akseptor yang tercatat pada filter: ${selectedMonth > 0 ? monthNames[selectedMonth - 1] : ''} ${selectedYear || ''} ${selectedVillage !== 'SEMUA' ? `Desa ${selectedVillage}` : ''}.`}
+              ? 'Belum Ada Data Register Pelayanan KB'
+              : 'Tidak Ada Data yang Sesuai Filter'}
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto mb-6 leading-relaxed">
+            Silakan klik tombol di bawah untuk mengentri data pelayanan KB baru sesuai format R/I/KB/20 (Kolom 1 s/d 24).
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={onAddNew}
-              className="inline-flex items-center space-x-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Tambah Pasien Baru</span>
-            </button>
-          </div>
+          <button
+            onClick={onAddNew}
+            className="inline-flex items-center space-x-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Entri Data Pasien KB Baru</span>
+          </button>
         </div>
       )}
 
-      {/* VIEW MODE SWITCHER FOR MOBILE & TABLET */}
+      {/* VIEW MODE SWITCHER FOR MOBILE */}
       {filteredRecords.length > 0 && (
         <div className="md:hidden flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs">
           <span className="text-xs font-bold text-slate-700 pl-1">
@@ -628,7 +505,7 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
                   : 'text-slate-600'
               }`}
             >
-              Tampilan HP
+              Kartu HP
             </button>
             <button
               type="button"
@@ -639,448 +516,553 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
                   : 'text-slate-600'
               }`}
             >
-              Tabel 23 Kolom
+              Tabel R/I/KB (24 Kolom)
             </button>
           </div>
         </div>
       )}
 
-      {/* MOBILE CARD LIST VIEW (SANGAT NYAMAN DI HP TANPA GESER TABEL LEBAR) */}
+      {/* MOBILE CARD VIEW */}
       {filteredRecords.length > 0 && mobileViewMode === 'cards' && (
         <div className="md:hidden space-y-3">
-          {filteredRecords.map((r, index) => (
-            <div
-              key={r.id}
-              className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500">
-                    <span className="font-bold text-slate-700">#{index + 1}</span>
-                    <span>•</span>
-                    <span>{r.serviceDate}</span>
-                    <span>•</span>
-                    <span className="text-emerald-700 font-semibold">{r.registerNumber}</span>
+          {filteredRecords.map((r, index) => {
+            const d = deriveR1KBRow(r);
+            return (
+              <div
+                key={r.id}
+                className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500">
+                      <span className="font-bold text-slate-800">#{index + 1}</span>
+                      <span>•</span>
+                      <span>{d.tanggalFormatted}</span>
+                      <span>•</span>
+                      <span className="text-emerald-700 font-bold">Kode Status: {d.col9}</span>
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-900 mt-0.5">{d.wifeName}</h4>
+                    <p className="text-xs text-slate-600">
+                      NIK: <span className="font-mono font-semibold">{r.wifeNik || '-'}</span> • Tgl Lahir:{' '}
+                      <span className="font-mono">{d.wifeDobFormatted}</span>
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      Suami: <span className="font-semibold text-slate-800">{d.husbandName}</span> • Alamat:{' '}
+                      <span className="font-semibold">{d.alamat}</span>
+                    </p>
                   </div>
-                  <h4 className="text-sm font-bold text-slate-900 mt-0.5">
-                    {r.wifeName}{' '}
-                    <span className="text-xs font-normal text-slate-500">({r.wifeAge} thn)</span>
-                  </h4>
-                  <p className="text-xs text-slate-600">
-                    NIK: <span className="font-mono font-semibold">{r.wifeNik || '-'}</span> • Suami:{' '}
-                    <span className="font-medium">{r.husbandName || '-'}</span>
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    {METHOD_SHORT_LABELS[r.method] || r.method}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Domisili:</span>
-                  <span className="font-semibold text-slate-800">Desa {r.village}</span>
-                  {r.address && <span className="text-[11px] text-slate-500 block truncate">{r.address}</span>}
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Status & Alokon:</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    {getStatusBadge(r.participantStatus)}
-                    <span className="text-[11px] font-semibold text-slate-700">• {r.alokonSource}</span>
+                  <div className="text-right shrink-0">
+                    <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-900 text-white font-mono">
+                      Kode Alokon: {d.col13 || d.col14 || d.col15}
+                    </span>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDetailRecord(r)}
-                  className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 active:scale-98 transition"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Detail</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onEdit(r)}
-                  className="flex-1 py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 active:scale-98 transition"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  <span>Edit</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm(`Hapus data register ${r.wifeName} (${r.registerNumber})?`)) {
-                      onDelete(r.id);
-                    }
-                  }}
-                  className="py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold flex items-center justify-center active:scale-98 transition"
-                  title="Hapus Data"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDetailRecord(r)}
+                    className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Detail</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onEdit(r)}
+                    className="flex-1 py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Hapus data register ${r.wifeName}?`)) {
+                        onDelete(r.id);
+                      }
+                    }}
+                    className="py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold flex items-center justify-center cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* OFFICIAL BKKBN TABLE VIEW (SESUAI DOKUMEN LAPORAN KB AGUSTUS 2026) */}
+      {/* OFFICIAL BKKBN R/I/KB/20 TABLE (PERSIS 24 KOLOM SEPERTI GAMBAR) */}
       {filteredRecords.length > 0 && (
-        <div className={`${mobileViewMode === 'cards' ? 'hidden md:block' : 'block'} bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden`}>
-          {/* Official Document Kop Header */}
-          <div className="bg-slate-50 p-4 border-b border-slate-300 text-center">
-            <div className="flex items-center justify-between border-b border-slate-300 pb-2 mb-2 text-[11px] font-mono">
-              <div className="text-left text-slate-700">
-                <div>KODE REGISTER: <b className="text-slate-900">{facility.k0kbCode}</b></div>
+        <div
+          className={`${
+            mobileViewMode === 'cards' ? 'hidden md:block' : 'block'
+          } bg-white rounded-2xl border border-slate-400 shadow-xs overflow-hidden p-3 sm:p-5 space-y-3`}
+        >
+          {/* KOP FORMULIR R/I/KB/20 PERSIS DOKUMEN */}
+          <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-4 pb-2 text-xs text-slate-900">
+            {/* Left: 1. Petugas Entri Data & Nama Faskes */}
+            <div className="space-y-2">
+              <div className="border border-slate-800 px-3 py-1.5 w-44 text-[11px] font-medium leading-tight">
+                1. Petugas Entri
+                <br />
+                Data
               </div>
-              <div className="px-2.5 py-0.5 border border-slate-800 rounded font-bold text-xs bg-white text-slate-900">
-                FORMULIR R/I/KB
-              </div>
-              <div className="text-right text-slate-600">
-                <div>PROVINSI: <b className="text-slate-900">{facility.province.toUpperCase()}</b></div>
-                <div>KABUPATEN: <b className="text-slate-900">{facility.regency.toUpperCase()}</b></div>
-                <div>KECAMATAN: <b className="text-slate-900">{facility.district.toUpperCase()}</b></div>
+              <div className="flex items-baseline space-x-2 text-xs">
+                <span className="font-semibold uppercase leading-tight">
+                  NAMA FASKES/
+                  <br />
+                  JARINGAN/JEJARING
+                </span>
+                <span>:</span>
+                <span className="border-b border-slate-800 px-2 pb-0.5 min-w-[180px] font-semibold">
+                  {faskesDisplayName}
+                </span>
               </div>
             </div>
 
-            <div className="pt-2">
-              <h3 className="text-sm sm:text-base font-extrabold uppercase text-slate-900 tracking-wider">
-                REGISTER PELAYANAN KELUARGA BERENCANA FASILITAS KESEHATAN
+            {/* Center: REGISTER PELAYANAN KB + Kotak Kode */}
+            <div className="flex flex-col items-center mx-auto">
+              <h3 className="text-lg sm:text-xl font-normal tracking-wide uppercase text-slate-950 mb-2">
+                REGISTER PELAYANAN KB
               </h3>
-              <h4 className="text-xs font-bold uppercase text-slate-800">
-                {facility.name}
-              </h4>
-              <div className="mt-1 text-xs text-slate-700 font-semibold flex items-center justify-center gap-3">
-                <span>
-                  PERIODE LAPORAN: <b>{selectedMonth > 0 ? monthNames[selectedMonth - 1].toUpperCase() : 'SEMUA BULAN'} {selectedYear}</b>
-                </span>
-                <span>•</span>
-                <span>
-                  CAKUPAN WILAYAH: <b>{selectedVillage === 'SEMUA' ? 'SELURUH DESA' : `DESA ${selectedVillage.toUpperCase()}`}</b>
-                </span>
+              <div className="flex items-start gap-2 text-center font-mono text-xs">
+                <div>
+                  <div className="flex border border-slate-800">
+                    <span className="w-6 h-6 flex items-center justify-center border-r border-slate-800 font-bold">
+                      3
+                    </span>
+                    <span className="w-6 h-6 flex items-center justify-center font-bold">5</span>
+                  </div>
+                  <span className="text-[9px] font-sans block mt-0.5">Kode Provinsi</span>
+                </div>
+                <div>
+                  <div className="flex border border-slate-800">
+                    <span className="w-6 h-6 flex items-center justify-center border-r border-slate-800 font-bold">
+                      2
+                    </span>
+                    <span className="w-6 h-6 flex items-center justify-center font-bold">2</span>
+                  </div>
+                  <span className="text-[9px] font-sans block mt-0.5 leading-tight">
+                    Kode
+                    <br />
+                    Kabupaten/Kota
+                  </span>
+                </div>
+                <div>
+                  <div className="flex border border-slate-800">
+                    <span className="w-6 h-6 flex items-center justify-center border-r border-slate-800 font-bold">
+                      0
+                    </span>
+                    <span className="w-6 h-6 flex items-center justify-center border-r border-slate-800 font-bold">
+                      0
+                    </span>
+                    <span className="w-6 h-6 flex items-center justify-center font-bold">4</span>
+                  </div>
+                  <span className="text-[9px] font-sans block mt-0.5">No. Register Faskes</span>
+                </div>
+                <div>
+                  <div className="flex border border-slate-800">
+                    <span className="w-6 h-6 flex items-center justify-center border-r border-slate-800 font-bold">
+                      0
+                    </span>
+                    <span className="w-6 h-6 flex items-center justify-center font-bold">2</span>
+                  </div>
+                  <span className="text-[9px] font-sans block mt-0.5 leading-tight">
+                    No. Jaringan/
+                    <br />
+                    Jejaring Faskes
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: R/I/KB/20, Lembar, Bulan & Tahun */}
+            <div className="flex flex-col items-end space-y-2 self-end">
+              <div className="flex items-end space-x-4">
+                <div className="bg-black text-white font-bold px-3 py-1 text-xs tracking-wider">
+                  R/I/KB/20
+                </div>
+                <div className="text-[11px]">
+                  Lembar <span className="border-b border-slate-800 px-3">1</span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1.5 text-[11px]">
+                <span>Bulan :</span>
+                <div className="border border-slate-800 text-[10px] font-mono">
+                  <div className="grid grid-cols-6 border-b border-slate-800">
+                    {[1, 2, 3, 4, 5, 6].map((m) => (
+                      <span
+                        key={m}
+                        className="w-5 h-4 flex items-center justify-center border-r last:border-r-0 border-slate-800"
+                      >
+                        {selectedMonth === m ? 'V' : m}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-6">
+                    {[7, 8, 9, 10, 11, 12].map((m) => (
+                      <span
+                        key={m}
+                        className="w-5 h-4 flex items-center justify-center border-r last:border-r-0 border-slate-800 font-bold"
+                      >
+                        {selectedMonth === m || (selectedMonth === 0 && m === 9) ? 'V' : m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="border border-slate-800 px-2.5 py-1.5 font-mono font-bold text-xs">
+                  {selectedYear || 2026}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* The Exact Official Table (23 BKKBN Columns + 1 Action Column) */}
+          {/* TABEL 24 KOLOM R/I/KB/20 */}
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px] border-collapse border border-slate-600 text-slate-900 min-w-[1280px]">
-              {/* Table Header: Grouped Multi-level Rows + Column Numbers (1) to (23) */}
+            <table className="w-full text-left text-[11px] border-collapse border border-slate-800 text-slate-950 min-w-[1440px]">
               <thead>
-                {/* Header Row 1: Grouped categories */}
-                <tr className="bg-slate-200/90 text-center font-bold text-slate-900 border-b border-slate-600">
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-9">
-                    NO
+                {/* ROW 1 HEADER */}
+                <tr className="text-center font-normal bg-white">
+                  <th rowSpan={3} className="border border-slate-800 p-1 w-8">
+                    NO.
                   </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-20">
-                    TANGGAL PELAYANAN
+                  <th rowSpan={3} className="border border-slate-800 p-1 w-20">
+                    TANGGAL
                   </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-24">
-                    NO. REGISTER / SERI KARTU
+                  <th colSpan={21} className="border border-slate-800 p-1">
+                    PESERTA KB
                   </th>
-                  <th colSpan={3} className="border border-slate-600 p-1.5 bg-emerald-100/70 text-emerald-950">
-                    IDENTITAS PESERTA KB (ISTRI)
+                  <th rowSpan={3} className="border border-slate-800 p-1 w-9">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto text-[10px] leading-tight py-1">
+                      STATUS PESERTA KB (Kode)
+                    </div>
                   </th>
-                  <th colSpan={2} className="border border-slate-600 p-1.5 bg-teal-100/70 text-teal-950">
-                    IDENTITAS SUAMI
+                  <th rowSpan={3} className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto text-[10px] leading-tight py-1">
+                      INFORMED CONSENT
+                    </div>
                   </th>
-                  <th colSpan={2} className="border border-slate-600 p-1.5 bg-sky-100/70 text-sky-950">
-                    ALAMAT DOMISILI
+                  <th rowSpan={3} className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto text-[10px] leading-tight py-1">
+                      PASCA PERSALINAN
+                    </div>
                   </th>
-                  <th colSpan={2} className="border border-slate-600 p-1.5 bg-blue-100/70 text-blue-950">
-                    JUMLAH ANAK HIDUP
+                  <th rowSpan={3} className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto text-[10px] leading-tight py-1">
+                      PASCA KEGUGURAN
+                    </div>
                   </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-16 bg-blue-50">
-                    UMUR ANAK TERKECIL
+                  <th colSpan={3} rowSpan={2} className="border border-slate-800 p-1">
+                    JENIS TINDAKAN
+                    <br />
+                    (Kode)
                   </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-24 bg-amber-100/70 text-amber-950">
-                    STATUS PESERTA KB
+                  <th colSpan={2} rowSpan={2} className="border border-slate-800 p-1">
+                    Kasus
+                    <br />
+                    (Kode)
                   </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-24 bg-emerald-100/70 text-emerald-950">
-                    METODE KONTRASEPSI
+                  <th colSpan={3} rowSpan={2} className="border border-slate-800 p-1">
+                    PENGGUNAAN
+                    <br />
+                    ASURANSI
                   </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-16 bg-purple-100/70 text-purple-950">
+                  <th colSpan={3} rowSpan={2} className="border border-slate-800 p-1">
                     SUMBER ALOKON
                   </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-20 bg-indigo-100/70 text-indigo-950">
-                    JENIS TINDAKAN
+                  <th rowSpan={3} className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto text-[10px] leading-tight py-1">
+                      PELAYANAN BERGERAK
+                    </div>
                   </th>
-                  <th colSpan={3} className="border border-slate-600 p-1.5 bg-rose-100/70 text-rose-950">
-                    PENAPISAN / PEMERIKSAAN MEDIS
-                  </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-20 bg-rose-50">
-                    EFEK SAMPING / KOMPLIKASI
-                  </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-14">
-                    RUJUKAN
-                  </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-28">
-                    PEMBERI PELAYANAN / PETUGAS
-                  </th>
-                  <th rowSpan={2} className="border border-slate-600 p-1.5 w-20 text-center bg-slate-300">
+                  <th rowSpan={3} className="border border-slate-800 p-1 w-16 bg-slate-100 print:hidden">
                     AKSI
                   </th>
                 </tr>
 
-                {/* Header Row 2: Sub-headers */}
-                <tr className="bg-slate-100 text-center font-bold text-slate-800 text-[10px] border-b border-slate-600">
-                  <th className="border border-slate-600 p-1 w-32 bg-emerald-50">NIK Istri (16 Digit)</th>
-                  <th className="border border-slate-600 p-1 w-32 bg-emerald-50">Nama Lengkap Istri</th>
-                  <th className="border border-slate-600 p-1 w-12 bg-emerald-50">Umur (Thn)</th>
-                  <th className="border border-slate-600 p-1 w-28 bg-teal-50">Nama Suami</th>
-                  <th className="border border-slate-600 p-1 w-32 bg-teal-50">NIK Suami</th>
-                  <th className="border border-slate-600 p-1 w-24 bg-sky-50">Desa / Kel.</th>
-                  <th className="border border-slate-600 p-1 w-32 bg-sky-50">RT/RW / Alamat</th>
-                  <th className="border border-slate-600 p-1 w-8 bg-blue-50">L</th>
-                  <th className="border border-slate-600 p-1 w-8 bg-blue-50">P</th>
-                  <th className="border border-slate-600 p-1 w-16 bg-rose-50">TD (mmHg)</th>
-                  <th className="border border-slate-600 p-1 w-12 bg-rose-50">BB (kg)</th>
-                  <th className="border border-slate-600 p-1 w-16 bg-rose-50">HPHT</th>
+                {/* ROW 2 HEADER */}
+                <tr className="text-center font-normal bg-white">
+                  <th rowSpan={2} className="border border-slate-800 p-1.5 w-32">
+                    NAMA SUAMI
+                  </th>
+                  <th colSpan={18} className="border border-slate-800 p-1">
+                    ISTRI
+                  </th>
+                  <th rowSpan={2} className="border border-slate-800 p-1.5 w-32">
+                    ALAMAT
+                  </th>
+                  <th rowSpan={2} className="border border-slate-800 p-1.5 w-24">
+                    NO. HANDPHONE
+                  </th>
                 </tr>
 
-                {/* Header Row 3: Official BKKBN Column Numbers (1) to (23) */}
-                <tr className="bg-slate-50 text-center text-[9px] text-slate-600 font-mono border-b border-slate-600">
-                  <th className="border border-slate-600 p-0.5">(1)</th>
-                  <th className="border border-slate-600 p-0.5">(2)</th>
-                  <th className="border border-slate-600 p-0.5">(3)</th>
-                  <th className="border border-slate-600 p-0.5">(4)</th>
-                  <th className="border border-slate-600 p-0.5">(5)</th>
-                  <th className="border border-slate-600 p-0.5">(6)</th>
-                  <th className="border border-slate-600 p-0.5">(7)</th>
-                  <th className="border border-slate-600 p-0.5">(8)</th>
-                  <th className="border border-slate-600 p-0.5">(9)</th>
-                  <th className="border border-slate-600 p-0.5">(10)</th>
-                  <th className="border border-slate-600 p-0.5">(11)</th>
-                  <th className="border border-slate-600 p-0.5">(12)</th>
-                  <th className="border border-slate-600 p-0.5">(13)</th>
-                  <th className="border border-slate-600 p-0.5">(14)</th>
-                  <th className="border border-slate-600 p-0.5">(15)</th>
-                  <th className="border border-slate-600 p-0.5">(16)</th>
-                  <th className="border border-slate-600 p-0.5">(17)</th>
-                  <th className="border border-slate-600 p-0.5">(18)</th>
-                  <th className="border border-slate-600 p-0.5">(19)</th>
-                  <th className="border border-slate-600 p-0.5">(20)</th>
-                  <th className="border border-slate-600 p-0.5">(21)</th>
-                  <th className="border border-slate-600 p-0.5">(22)</th>
-                  <th className="border border-slate-600 p-0.5">(23)</th>
-                  <th className="border border-slate-600 p-0.5 bg-slate-200">Aksi</th>
+                {/* ROW 3 HEADER */}
+                <tr className="text-center font-normal bg-white text-[10px]">
+                  <th colSpan={16} className="border border-slate-800 p-1">
+                    NIK (NOMOR INDUK KEPENDUDUKAN)
+                  </th>
+                  <th className="border border-slate-800 p-1 w-32">NAMA</th>
+                  <th className="border border-slate-800 p-1 w-20">
+                    TANGGAL
+                    <br />
+                    LAHIR
+                  </th>
+                  {/* 13, 14, 15 */}
+                  <th className="border border-slate-800 p-1 w-10">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      OPERATIF / PEMBERIAN / PEMASANGAN
+                    </div>
+                  </th>
+                  <th className="border border-slate-800 p-1 w-9">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      PENCABUTAN DAN PEMASANGAN
+                    </div>
+                  </th>
+                  <th className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      PENCABUTAN
+                    </div>
+                  </th>
+                  {/* 16, 17 */}
+                  <th className="border border-slate-800 p-1 w-9">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      KOMPLIKASI BERAT
+                    </div>
+                  </th>
+                  <th className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      KEGAGALAN
+                    </div>
+                  </th>
+                  {/* 18, 19, 20 */}
+                  <th className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      BPJS KESEHATAN
+                    </div>
+                  </th>
+                  <th className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      LAINNYA
+                    </div>
+                  </th>
+                  <th className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      TIDAK
+                    </div>
+                  </th>
+                  {/* 21, 22, 23 */}
+                  <th className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      APBN
+                    </div>
+                  </th>
+                  <th className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      APBD
+                    </div>
+                  </th>
+                  <th className="border border-slate-800 p-1 w-8">
+                    <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                      MANDIRI
+                    </div>
+                  </th>
+                </tr>
+
+                {/* ROW 4: NOMOR KOLOM 1 s/d 24 */}
+                <tr className="text-center text-[10px] font-normal bg-white border-b border-slate-800">
+                  <th className="border border-slate-800 py-0.5">1</th>
+                  <th className="border border-slate-800 py-0.5">2</th>
+                  <th className="border border-slate-800 py-0.5">3</th>
+                  <th colSpan={16} className="border border-slate-800 py-0.5">
+                    4
+                  </th>
+                  <th className="border border-slate-800 py-0.5">5</th>
+                  <th className="border border-slate-800 py-0.5">6</th>
+                  <th className="border border-slate-800 py-0.5">7</th>
+                  <th className="border border-slate-800 py-0.5">8</th>
+                  <th className="border border-slate-800 py-0.5">9</th>
+                  <th className="border border-slate-800 py-0.5">10</th>
+                  <th className="border border-slate-800 py-0.5">11</th>
+                  <th className="border border-slate-800 py-0.5">12</th>
+                  <th className="border border-slate-800 py-0.5">13</th>
+                  <th className="border border-slate-800 py-0.5">14</th>
+                  <th className="border border-slate-800 py-0.5">15</th>
+                  <th className="border border-slate-800 py-0.5">16</th>
+                  <th className="border border-slate-800 py-0.5">17</th>
+                  <th className="border border-slate-800 py-0.5">18</th>
+                  <th className="border border-slate-800 py-0.5">19</th>
+                  <th className="border border-slate-800 py-0.5">20</th>
+                  <th className="border border-slate-800 py-0.5">21</th>
+                  <th className="border border-slate-800 py-0.5">22</th>
+                  <th className="border border-slate-800 py-0.5">23</th>
+                  <th className="border border-slate-800 py-0.5">24</th>
+                  <th className="border border-slate-800 py-0.5 bg-slate-100 print:hidden">Aksi</th>
                 </tr>
               </thead>
 
-              {/* Table Body */}
-              <tbody className="divide-y divide-slate-300">
-                {filteredRecords.map((r, index) => (
-                  <tr
-                    key={r.id}
-                    className="hover:bg-amber-50/50 even:bg-slate-50/60 transition-colors"
-                  >
-                    {/* (1) NO */}
-                    <td className="border border-slate-500 p-1.5 text-center font-mono font-semibold text-slate-700">
-                      {index + 1}
-                    </td>
-
-                    {/* (2) TANGGAL PELAYANAN */}
-                    <td className="border border-slate-500 p-1.5 text-center font-mono whitespace-nowrap">
-                      {r.serviceDate}
-                    </td>
-
-                    {/* (3) NO. REGISTER */}
-                    <td className="border border-slate-500 p-1.5 text-center font-mono font-bold text-slate-800 whitespace-nowrap">
-                      {r.registerNumber}
-                    </td>
-
-                    {/* (4) NIK ISTRI (16 DIGIT) */}
-                    <td className="border border-slate-500 p-1.5 font-mono text-[10px] text-slate-900 tracking-tight whitespace-nowrap">
-                      {r.wifeNik ? (
-                        <span className="font-semibold">{r.wifeNik}</span>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-
-                    {/* (5) NAMA LENGKAP ISTRI */}
-                    <td className="border border-slate-500 p-1.5 font-semibold text-slate-900">
-                      {r.wifeName}
-                    </td>
-
-                    {/* (6) UMUR ISTRI */}
-                    <td className="border border-slate-500 p-1.5 text-center font-mono">
-                      {r.wifeAge}
-                    </td>
-
-                    {/* (7) NAMA SUAMI */}
-                    <td className="border border-slate-500 p-1.5 text-slate-800">
-                      {r.husbandName || '-'}
-                    </td>
-
-                    {/* (8) NIK SUAMI */}
-                    <td className="border border-slate-500 p-1.5 font-mono text-[10px] text-slate-600 whitespace-nowrap">
-                      {r.husbandNik || '-'}
-                    </td>
-
-                    {/* (9) DESA / KELURAHAN */}
-                    <td className="border border-slate-500 p-1.5 font-medium text-slate-900">
-                      Desa {r.village}
-                    </td>
-
-                    {/* (10) RT/RW / ALAMAT */}
-                    <td className="border border-slate-500 p-1.5 text-[10px] text-slate-700 truncate max-w-[140px]" title={r.address}>
-                      {r.address || '-'}
-                    </td>
-
-                    {/* (11) JUMLAH ANAK L */}
-                    <td className="border border-slate-500 p-1.5 text-center font-mono font-semibold">
-                      {r.aliveChildrenMale}
-                    </td>
-
-                    {/* (12) JUMLAH ANAK P */}
-                    <td className="border border-slate-500 p-1.5 text-center font-mono font-semibold">
-                      {r.aliveChildrenFemale}
-                    </td>
-
-                    {/* (13) UMUR ANAK TERKECIL */}
-                    <td className="border border-slate-500 p-1.5 text-center font-mono text-[10px]">
-                      {r.youngestChildAgeMonths > 0 ? `${r.youngestChildAgeMonths} bln` : '-'}
-                    </td>
-
-                    {/* (14) STATUS PESERTA KB */}
-                    <td className="border border-slate-500 p-1.5 text-center whitespace-nowrap">
-                      {getStatusBadge(r.participantStatus)}
-                    </td>
-
-                    {/* (15) METODE KONTRASEPSI */}
-                    <td className="border border-slate-500 p-1.5 text-center font-bold text-emerald-900 whitespace-nowrap">
-                      {METHOD_SHORT_LABELS[r.method] || r.method}
-                    </td>
-
-                    {/* (16) SUMBER ALOKON */}
-                    <td className="border border-slate-500 p-1.5 text-center font-semibold text-[10px]">
-                      <span className={r.alokonSource === 'APBN' ? 'text-purple-800' : 'text-slate-700'}>
-                        {r.alokonSource}
-                      </span>
-                    </td>
-
-                    {/* (17) JENIS TINDAKAN */}
-                    <td className="border border-slate-500 p-1.5 text-center text-[10px]">
-                      {ACTION_LABELS[r.actionType] || r.actionType}
-                    </td>
-
-                    {/* (18) TD (mmHg) */}
-                    <td className="border border-slate-500 p-1.5 text-center font-mono text-[10px] whitespace-nowrap">
-                      {r.bloodPressure || '-'}
-                    </td>
-
-                    {/* (19) BB (kg) */}
-                    <td className="border border-slate-500 p-1.5 text-center font-mono text-[10px]">
-                      {r.weightKg > 0 ? `${r.weightKg}` : '-'}
-                    </td>
-
-                    {/* (20) HPHT */}
-                    <td className="border border-slate-500 p-1.5 text-center font-mono text-[10px] whitespace-nowrap">
-                      {r.hpht || '-'}
-                    </td>
-
-                    {/* (21) EFEK SAMPING / KOMPLIKASI */}
-                    <td className="border border-slate-500 p-1.5 text-center text-[10px]">
-                      {r.complications && r.complications !== 'Tidak Ada' ? (
-                        <span className="text-rose-700 font-bold">{r.complications}</span>
-                      ) : r.sideEffects && r.sideEffects !== 'Tidak Ada' ? (
-                        <span className="text-amber-700">{r.sideEffects}</span>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-
-                    {/* (22) RUJUKAN */}
-                    <td className="border border-slate-500 p-1.5 text-center text-[10px]">
-                      {r.referralStatus === 'TIDAK' ? 'Tidak' : (
-                        <span className="text-rose-600 font-bold">Rujuk</span>
-                      )}
-                    </td>
-
-                    {/* (23) PETUGAS PELAYANAN */}
-                    <td className="border border-slate-500 p-1.5 text-[10px] font-medium text-slate-800 truncate max-w-[120px]" title={r.officerName}>
-                      {r.officerName}
-                    </td>
-
-                    {/* (AKSI) */}
-                    <td className="border border-slate-500 p-1.5 text-center whitespace-nowrap bg-slate-50">
-                      <div className="flex items-center justify-center space-x-1">
-                        <button
-                          onClick={() => setDetailRecord(r)}
-                          className="p-1 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded transition cursor-pointer"
-                          title="Lihat Detail Pasien"
+              <tbody>
+                {filteredRecords.map((r, index) => {
+                  const d = deriveR1KBRow(r);
+                  return (
+                    <tr key={r.id} className="hover:bg-amber-50/40 transition-colors">
+                      {/* 1: NO */}
+                      <td className="border border-slate-800 p-1.5 text-center">{index + 1}</td>
+                      {/* 2: TANGGAL */}
+                      <td className="border border-slate-800 p-1.5 text-center whitespace-nowrap">
+                        {d.tanggalFormatted}
+                      </td>
+                      {/* 3: NAMA SUAMI */}
+                      <td className="border border-slate-800 p-1.5 uppercase">{d.husbandName}</td>
+                      {/* 4: 16 KOTAK DIGIT NIK ISTRI */}
+                      {d.nikDigits.map((digit, dIdx) => (
+                        <td
+                          key={dIdx}
+                          className="border border-slate-800 px-1 py-1.5 text-center font-mono text-[10px] w-4"
                         >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => onEdit(r)}
-                          className="p-1 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded transition cursor-pointer"
-                          title="Ubah Data"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Hapus data register ${r.wifeName} (${r.registerNumber})?`)) {
-                              onDelete(r.id);
-                            }
-                          }}
-                          className="p-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
-                          title="Hapus Data"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {digit}
+                        </td>
+                      ))}
+                      {/* 5: NAMA ISTRI */}
+                      <td className="border border-slate-800 p-1.5 uppercase">{d.wifeName}</td>
+                      {/* 6: TANGGAL LAHIR */}
+                      <td className="border border-slate-800 p-1.5 text-center whitespace-nowrap">
+                        {d.wifeDobFormatted}
+                      </td>
+                      {/* 7: ALAMAT */}
+                      <td className="border border-slate-800 p-1.5 uppercase">{d.alamat}</td>
+                      {/* 8: NO. HANDPHONE */}
+                      <td className="border border-slate-800 p-1.5 text-center font-mono text-[10px]">
+                        {d.phone}
+                      </td>
+                      {/* 9: STATUS PESERTA KB (Kode) */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col9}</td>
+                      {/* 10: INFORMED CONSENT */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col10}</td>
+                      {/* 11: PASCA PERSALINAN */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col11}</td>
+                      {/* 12: PASCA KEGUGURAN */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col12}</td>
+                      {/* 13: OPERATIF / PEMBERIAN / PEMASANGAN */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col13}</td>
+                      {/* 14: PENCABUTAN DAN PEMASANGAN */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col14}</td>
+                      {/* 15: PENCABUTAN */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col15}</td>
+                      {/* 16: KOMPLIKASI BERAT */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col16}</td>
+                      {/* 17: KEGAGALAN */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col17}</td>
+                      {/* 18: BPJS KESEHATAN */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col18}</td>
+                      {/* 19: LAINNYA */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col19}</td>
+                      {/* 20: TIDAK */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col20}</td>
+                      {/* 21: APBN */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col21}</td>
+                      {/* 22: APBD */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col22}</td>
+                      {/* 23: MANDIRI */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col23}</td>
+                      {/* 24: PELAYANAN BERGERAK */}
+                      <td className="border border-slate-800 p-1.5 text-center">{d.col24}</td>
+
+                      {/* AKSI */}
+                      <td className="border border-slate-800 p-1 text-center whitespace-nowrap bg-slate-50 print:hidden">
+                        <div className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={() => setDetailRecord(r)}
+                            className="p-1 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition cursor-pointer"
+                            title="Detail"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onEdit(r)}
+                            className="p-1 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded transition cursor-pointer"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Hapus data register ${r.wifeName}?`)) {
+                                onDelete(r.id);
+                              }
+                            }}
+                            className="p-1 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                            title="Hapus"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
+            </table>
+          </div>
 
-              {/* Summary / Total Footer Row */}
-              <tfoot>
-                <tr className="bg-slate-200/90 font-bold text-slate-900 border-t-2 border-slate-600 text-center">
-                  <td colSpan={10} className="border border-slate-600 p-2 text-right uppercase">
-                    JUMLAH / TOTAL TERLAYANI ({summary.total} PASIEN) :
-                  </td>
-                  <td className="border border-slate-600 p-2 font-mono">{summary.totalAnakL}</td>
-                  <td className="border border-slate-600 p-2 font-mono">{summary.totalAnakP}</td>
-                  <td className="border border-slate-600 p-2 text-[10px] text-slate-600">-</td>
-                  <td className="border border-slate-600 p-2 text-[10px]">
-                    Baru: {summary.totalBaru} | KBPP: {summary.totalKbpp} | Ganti: {summary.totalGantiCara} | Ulang: {summary.totalUlangan}
-                  </td>
-                  <td className="border border-slate-600 p-2 text-[10px] text-emerald-900">
-                    {summary.total} Akseptor
-                  </td>
-                  <td className="border border-slate-600 p-2 text-[10px]">
-                    APBN: {summary.totalApbn}
-                  </td>
-                  <td colSpan={8} className="border border-slate-600 p-2 text-left text-[10px] text-slate-600">
-                    Kondisi: Terdata Lengkap
+          {/* KETERANGAN KODE PERSIS SEPERTI DOKUMEN R/I/KB/20 */}
+          <div className="pt-2 space-y-2 text-[11px] text-slate-900">
+            <div className="font-medium">1) Keterangan Kode</div>
+            <table className="border-collapse border border-slate-800 text-[10px] w-full max-w-5xl">
+              <thead>
+                <tr className="text-center font-medium">
+                  <th colSpan={2} className="border border-slate-800 py-1 px-3 w-1/3">
+                    STATUS PESERTA KB
+                  </th>
+                  <th colSpan={6} className="border border-slate-800 py-1 px-3">
+                    KODE JENIS ALOKON (Diisi Pada Jenis Tindakan dan Kasus)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border-l border-slate-800 py-1 px-3">1 : Peserta KB Baru</td>
+                  <td className="border-r border-slate-800 py-1 px-3">3 : Peserta KB Ulangan</td>
+                  <td className="py-1 px-2">1 : Suntikan 1 Bulanan</td>
+                  <td className="py-1 px-2">3 : Suntikan 3 Bulanan</td>
+                  <td className="py-1 px-2">5 : Pil Progestin</td>
+                  <td className="py-1 px-2">7 : Implan 1 Batang</td>
+                  <td className="py-1 px-2">9 : IUD</td>
+                  <td className="border-r border-slate-800 py-1 px-2">11 : Tubektomi</td>
+                </tr>
+                <tr className="border-b border-slate-800">
+                  <td className="border-l border-slate-800 py-1 px-3">2 : Peserta KB Ganti</td>
+                  <td className="border-r border-slate-800 py-1 px-3">4 : Komplikasi</td>
+                  <td className="py-1 px-2">2 : Suntikan 3 Bulanan</td>
+                  <td className="py-1 px-2">4 : Pil Kombinasi</td>
+                  <td className="py-1 px-2">6 : Kondom</td>
+                  <td className="py-1 px-2">8 : Implan 2 Batang</td>
+                  <td className="py-1 px-2" colSpan={2}>
+                    10 : Vasektomi
                   </td>
                 </tr>
-              </tfoot>
+              </tbody>
             </table>
+            <div className="font-medium">
+              2) SELAIN STATUS PESERTA KB, JENIS TINDAKAN DAN KASUS DIISI TANDA CENTANG (V)
+            </div>
           </div>
         </div>
       )}
 
-      {/* DETAIL MODAL (SIMPEL & JELAS) */}
+      {/* DETAIL MODAL */}
       {detailRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
           <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="bg-emerald-700 text-white p-5 flex items-center justify-between">
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-mono text-emerald-200 uppercase tracking-wider">
-                  No. Register: {detailRecord.registerNumber}
+                <span className="text-[11px] font-mono text-emerald-400 uppercase tracking-wider">
+                  FORMULIR R/I/KB/20 • {detailRecord.serviceDate}
                 </span>
-                <h3 className="text-lg font-bold mt-0.5">{detailRecord.wifeName}</h3>
-                <p className="text-xs text-emerald-100">
-                  Usia: {detailRecord.wifeAge} Tahun • Suami: {detailRecord.husbandName || '-'}
+                <h3 className="text-lg font-bold mt-0.5 uppercase">{detailRecord.wifeName}</h3>
+                <p className="text-xs text-slate-300">
+                  Suami: {detailRecord.husbandName || '-'} • Alamat: {detailRecord.address}
                 </p>
               </div>
               <button
@@ -1091,141 +1073,88 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
               </button>
             </div>
 
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs text-slate-700">
-              {/* Identitas Pasien */}
-              <div>
-                <h4 className="font-bold text-slate-900 text-xs mb-2 border-b border-slate-100 pb-1 flex items-center space-x-1.5">
-                  <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Identitas Akseptor & Suami</span>
-                </h4>
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
+            {(() => {
+              const d = deriveR1KBRow(detailRecord);
+              const alokonLabel =
+                ALOKON_KODE_OPTIONS.find(
+                  (o) => o.code === Number(d.col13 || d.col14 || d.col15)
+                )?.label || detailRecord.method;
+              return (
+                <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs text-slate-700">
                   <div>
-                    <span className="text-slate-400 block">NIK Istri:</span>
-                    <span className="font-mono font-bold text-slate-900">{detailRecord.wifeNik || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">NIK Suami:</span>
-                    <span className="font-mono font-bold text-slate-900">{detailRecord.husbandNik || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Tanggal Lahir Istri:</span>
-                    <span className="font-medium text-slate-800">{detailRecord.wifeDob || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">No. JKN / BPJS:</span>
-                    <span className="font-mono font-medium text-slate-800">{detailRecord.bpjsNumber || '-'}</span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-slate-400 block">Alamat / Desa:</span>
-                    <span className="font-medium text-slate-800">
-                      {detailRecord.address}, Desa {detailRecord.village}, Kec. {detailRecord.district}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Jumlah Anak Hidup:</span>
-                    <span className="font-medium text-slate-800">
-                      {detailRecord.aliveChildrenMale} Laki-laki / {detailRecord.aliveChildrenFemale} Perempuan
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Usia Anak Terkecil:</span>
-                    <span className="font-medium text-slate-800">
-                      {detailRecord.youngestChildAgeMonths > 0 ? `${detailRecord.youngestChildAgeMonths} Bulan` : '-'}
-                    </span>
+                    <h4 className="font-bold text-slate-900 text-xs mb-2 border-b border-slate-100 pb-1 flex items-center space-x-1.5">
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Rincian Kolom 1 s/d 24 (R/I/KB/20)</span>
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+                      <div>
+                        <span className="text-slate-400 block">(2) Tanggal:</span>
+                        <span className="font-bold text-slate-900">{d.tanggalFormatted}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">(3) Nama Suami:</span>
+                        <span className="font-bold text-slate-900">{d.husbandName}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-slate-400 block">(4) NIK Istri (16 Digit):</span>
+                        <span className="font-mono font-bold text-slate-900 tracking-widest">
+                          {detailRecord.wifeNik || '-'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">(5) Nama Istri:</span>
+                        <span className="font-bold text-slate-900">{d.wifeName}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">(6) Tanggal Lahir:</span>
+                        <span className="font-bold text-slate-900">{d.wifeDobFormatted}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">(7) Alamat:</span>
+                        <span className="font-bold text-slate-900">{d.alamat}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">(8) No. Handphone:</span>
+                        <span className="font-mono font-bold text-slate-900">{d.phone || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">(9) Status Peserta KB:</span>
+                        <span className="font-bold text-emerald-700">
+                          {STATUS_PESERTA_KODE_LABELS[d.col9] || d.col9}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">(13-15) Jenis Tindakan:</span>
+                        <span className="font-bold text-slate-900">{alokonLabel}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">(18-20) Asuransi:</span>
+                        <span className="font-bold text-slate-900">
+                          {d.col18 ? 'BPJS Kesehatan' : d.col19 ? 'Lainnya' : 'Tidak'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">(21-23) Sumber Alokon:</span>
+                        <span className="font-bold text-slate-900">
+                          {d.col21 ? 'APBN' : d.col22 ? 'APBD' : 'MANDIRI'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              );
+            })()}
 
-              {/* Data Pelayanan KB */}
-              <div>
-                <h4 className="font-bold text-slate-900 text-xs mb-2 border-b border-slate-100 pb-1 flex items-center space-x-1.5">
-                  <Heart className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Layanan Kontrasepsi</span>
-                </h4>
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div>
-                    <span className="text-slate-400 block">Metode Kontrasepsi:</span>
-                    <span className="font-bold text-emerald-800 text-xs">
-                      {METHOD_SHORT_LABELS[detailRecord.method]}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Status Kepesertaan:</span>
-                    <span className="font-semibold text-slate-800">
-                      {STATUS_LABELS[detailRecord.participantStatus] || detailRecord.participantStatus}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Sumber Alokon:</span>
-                    <span className="font-medium text-slate-800">{ALOKON_LABELS[detailRecord.alokonSource] || detailRecord.alokonSource}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Jenis Tindakan:</span>
-                    <span className="font-medium text-slate-800">{ACTION_LABELS[detailRecord.actionType] || detailRecord.actionType}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Tanggal Dilayani:</span>
-                    <span className="font-medium text-slate-800">{detailRecord.serviceDate}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Tempat Layanan:</span>
-                    <span className="font-medium text-slate-800">{detailRecord.servicePlace}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Skrining Medis */}
-              <div>
-                <h4 className="font-bold text-slate-900 text-xs mb-2 border-b border-slate-100 pb-1 flex items-center space-x-1.5">
-                  <Stethoscope className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Pemeriksaan Medis / Penapisan</span>
-                </h4>
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div>
-                    <span className="text-slate-400 block">Tekanan Darah:</span>
-                    <span className="font-mono font-bold text-slate-800">{detailRecord.bloodPressure || '-'} mmHg</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Berat Badan:</span>
-                    <span className="font-mono font-bold text-slate-800">{detailRecord.weightKg} kg</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">HPHT:</span>
-                    <span className="font-mono text-slate-800">{detailRecord.hpht || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Status Rujukan:</span>
-                    <span className="font-medium text-slate-800">{detailRecord.referralStatus}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Efek Samping:</span>
-                    <span className="font-medium text-slate-800">{detailRecord.sideEffects || 'Tidak Ada'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Komplikasi:</span>
-                    <span className="font-medium text-slate-800">{detailRecord.complications || 'Tidak Ada'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Petugas */}
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                <span>Bidan / Petugas: <b className="text-slate-800">{detailRecord.officerName}</b></span>
-                <span>Diinput: <b className="text-slate-800">{detailRecord.createdByUsername}</b></span>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 p-4 border-t border-slate-100 flex items-center justify-end space-x-2">
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2">
               <button
                 onClick={() => {
-                  const r = detailRecord;
+                  const rec = detailRecord;
                   setDetailRecord(null);
-                  onEdit(r);
+                  onEdit(rec);
                 }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
               >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>Ubah Data Ini</span>
+                Edit Data
               </button>
               <button
                 onClick={() => setDetailRecord(null)}

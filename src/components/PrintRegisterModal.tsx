@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { FacilityProfile, PatientRecord, Village } from '../types';
-import { METHOD_SHORT_LABELS, STATUS_LABELS, ACTION_LABELS } from '../data/initialData';
+import { deriveR1KBRow } from '../data/initialData';
 import { Printer, X, Download } from 'lucide-react';
 
 interface PrintRegisterModalProps {
@@ -21,17 +21,31 @@ export const PrintRegisterModal: React.FC<PrintRegisterModalProps> = ({
   const [filterVillage, setFilterVillage] = useState<string>(
     villages.length === 1 ? villages[0].name : 'SEMUA'
   );
-  const [filterMonth, setFilterMonth] = useState<number>(8); // Default Agustus (sesuai dokumen Laporan KB Agustus 2026)
+  const [filterMonth, setFilterMonth] = useState<number>(9); // Default September
   const [filterYear, setFilterYear] = useState<number>(2026);
 
   const monthNames = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
   ];
 
   const printableRecords = useMemo(() => {
     return records.filter((r) => {
-      if (filterVillage !== 'SEMUA' && r.village.toLowerCase() !== filterVillage.toLowerCase()) return false;
+      if (
+        filterVillage !== 'SEMUA' &&
+        r.village.toLowerCase() !== filterVillage.toLowerCase()
+      )
+        return false;
       if (r.serviceDate) {
         const [y, m] = r.serviceDate.split('-').map(Number);
         if (filterYear !== 0 && y !== filterYear) return false;
@@ -41,107 +55,56 @@ export const PrintRegisterModal: React.FC<PrintRegisterModalProps> = ({
     });
   }, [records, filterVillage, filterMonth, filterYear]);
 
-  // Totals for bottom summary row
-  const summary = useMemo(() => {
-    let totalAnakL = 0;
-    let totalAnakP = 0;
-    let totalBaru = 0;
-    let totalGantiCara = 0;
-    let totalUlangan = 0;
-    let totalApbn = 0;
-    let totalMandiri = 0;
-
-    printableRecords.forEach((r) => {
-      totalAnakL += r.aliveChildrenMale || 0;
-      totalAnakP += r.aliveChildrenFemale || 0;
-      if (
-        r.participantStatus === 'BARU_BUKAN_PASCA' ||
-        r.participantStatus === 'BARU_PASCA_SALIN' ||
-        r.participantStatus === 'BARU_PASCA_GUGUR'
-      ) {
-        totalBaru += 1;
-      } else if (r.participantStatus === 'GANTI_CARA') {
-        totalGantiCara += 1;
-      } else if (r.participantStatus === 'ULANGAN') {
-        totalUlangan += 1;
-      }
-
-      if (r.alokonSource === 'APBN') {
-        totalApbn += 1;
-      } else {
-        totalMandiri += 1;
-      }
-    });
-
-    return {
-      total: printableRecords.length,
-      totalAnakL,
-      totalAnakP,
-      totalBaru,
-      totalGantiCara,
-      totalUlangan,
-      totalApbn,
-      totalMandiri,
-    };
-  }, [printableRecords]);
-
   if (!isOpen) return null;
 
-  const getStatusLabelText = (status: string) => {
-    switch (status) {
-      case 'BARU_PASCA_SALIN':
-        return 'Baru (KBPP)';
-      case 'BARU_BUKAN_PASCA':
-        return 'Baru';
-      case 'BARU_PASCA_GUGUR':
-        return 'Baru (Gugur)';
-      case 'GANTI_CARA':
-        return 'Ganti Cara';
-      case 'ULANGAN':
-        return 'Ulangan';
-      default:
-        return status;
-    }
+  const faskesDisplayName =
+    filterVillage !== 'SEMUA'
+      ? `Pustu ${filterVillage}`
+      : villages.length === 1
+      ? `Pustu ${villages[0].name}`
+      : facility.name;
+
+  const handlePrintNow = () => {
+    window.print();
   };
 
   const handleDownloadExcel = () => {
-    const periodLabel = `${filterMonth !== 0 ? monthNames[filterMonth - 1].toUpperCase() : 'SEMUA BULAN'} ${filterYear}`;
-    const regionLabel = filterVillage === 'SEMUA' ? 'SELURUH DESA' : `DESA ${filterVillage.toUpperCase()}`;
-
     const rowsHtml = printableRecords
-      .map((r, i) => {
-        const sideEffectText =
-          r.complications && r.complications !== 'Tidak Ada'
-            ? r.complications
-            : r.sideEffects && r.sideEffects !== 'Tidak Ada'
-            ? r.sideEffects
-            : '-';
+      .map((r, index) => {
+        const d = deriveR1KBRow(r);
+        const nikCells = d.nikDigits
+          .map(
+            (digit) =>
+              `<td style="border:1px solid #000000; padding:3px 2px; text-align:center; font-family:Arial,sans-serif; font-size:8.5pt; width:16px;">${digit}</td>`
+          )
+          .join('');
 
         return `
-          <tr style="text-align:center;">
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace;">${i + 1}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace; mso-number-format:'\\@';">${r.serviceDate}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace; font-weight:bold; mso-number-format:'\\@';">${r.registerNumber}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace; mso-number-format:'\\@';">${r.wifeNik || '-'}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:left; font-weight:bold;">${r.wifeName}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace;">${r.wifeAge}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:left;">${r.husbandName || '-'}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace; mso-number-format:'\\@';">${r.husbandNik || '-'}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:left;">Desa ${r.village}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:left;">${r.address || '-'}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace;">${r.aliveChildrenMale}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace;">${r.aliveChildrenFemale}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace;">${r.youngestChildAgeMonths > 0 ? `${r.youngestChildAgeMonths} bln` : '-'}</td>
-            <td style="border:1px solid #000000; padding:4px; font-weight:600;">${getStatusLabelText(r.participantStatus)}</td>
-            <td style="border:1px solid #000000; padding:4px; font-weight:bold;">${METHOD_SHORT_LABELS[r.method] || r.method}</td>
-            <td style="border:1px solid #000000; padding:4px;">${r.alokonSource}</td>
-            <td style="border:1px solid #000000; padding:4px;">${ACTION_LABELS[r.actionType] || r.actionType}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace; mso-number-format:'\\@';">${r.bloodPressure || '-'}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace;">${r.weightKg > 0 ? r.weightKg : '-'}</td>
-            <td style="border:1px solid #000000; padding:4px; font-family:Consolas,monospace; mso-number-format:'\\@';">${r.hpht || '-'}</td>
-            <td style="border:1px solid #000000; padding:4px;">${sideEffectText}</td>
-            <td style="border:1px solid #000000; padding:4px;">${r.referralStatus === 'TIDAK' ? 'Tidak' : 'Rujuk'}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:left;">${r.officerName}</td>
+          <tr>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${index + 1}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center; white-space:nowrap;">${d.tanggalFormatted}</td>
+            <td style="border:1px solid #000000; padding:4px;">${d.husbandName}</td>
+            ${nikCells}
+            <td style="border:1px solid #000000; padding:4px;">${d.wifeName}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center; white-space:nowrap;">${d.wifeDobFormatted}</td>
+            <td style="border:1px solid #000000; padding:4px;">${d.alamat}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center; mso-number-format:'\\@';">${d.phone}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col9}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col10}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col11}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col12}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col13}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col14}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col15}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col16}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col17}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col18}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col19}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col20}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col21}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col22}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col23}</td>
+            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col24}</td>
           </tr>
         `;
       })
@@ -151,129 +114,50 @@ export const PrintRegisterModal: React.FC<PrintRegisterModalProps> = ({
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
         <meta charset="UTF-8" />
-        <!--[if gte mso 9]>
-        <xml>
-          <x:ExcelWorkbook>
-            <x:ExcelWorksheets>
-              <x:ExcelWorksheet>
-                <x:Name>Register Pelayanan KB</x:Name>
-                <x:WorksheetOptions>
-                  <x:DisplayGridlines/>
-                </x:WorksheetOptions>
-              </x:ExcelWorksheet>
-            </x:ExcelWorksheets>
-          </x:ExcelWorkbook>
-        </xml>
-        <![endif]-->
       </head>
-      <body style="font-family:Arial,sans-serif; font-size:9.5pt; color:#000000;">
-        <table style="border-collapse:collapse; width:100%;">
-          <tr>
-            <td colspan="10" style="font-family:Consolas,monospace; font-size:9pt; font-weight:bold;">
-              KODE REGISTER: ${facility.k0kbCode} &bull; FORMULIR R/I/KB
-            </td>
-            <td colspan="13" style="font-family:Consolas,monospace; font-size:9pt; font-weight:bold; text-align:right;">
-              PROVINSI: ${facility.province.toUpperCase()} &bull; KABUPATEN: ${facility.regency.toUpperCase()} &bull; DINAS P3AKB BOJONEGORO
-            </td>
-          </tr>
-          <tr>
-            <td colspan="23" style="text-align:center; font-size:12pt; font-weight:bold; padding-top:4px;">
-              REGISTER PELAYANAN KELUARGA BERENCANA DINAS P3AKB KABUPATEN BOJONEGORO
-            </td>
-          </tr>
-          <tr>
-            <td colspan="23" style="text-align:center; font-size:10.5pt; font-weight:bold;">
-              ${facility.name.toUpperCase()}
-            </td>
-          </tr>
-          <tr>
-            <td colspan="23" style="text-align:center; font-size:9pt; font-weight:bold; padding-bottom:8px;">
-              Periode Laporan: ${periodLabel} &bull; Cakupan Wilayah: ${regionLabel}
-            </td>
-          </tr>
-        </table>
-
-        <table style="border-collapse:collapse; width:100%; font-size:9pt;">
+      <body style="font-family:Arial,sans-serif; font-size:9pt; color:#000000;">
+        <table style="border-collapse:collapse; width:100%; font-size:8.5pt;">
           <thead>
-            <tr style="background-color:#e2e8f0; text-align:center; font-weight:bold;">
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">NO</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">TANGGAL PELAYANAN</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">NO. REGISTER / SERI KARTU</th>
-              <th colspan="3" style="border:1px solid #000000; padding:4px;">IDENTITAS PESERTA KB (ISTRI)</th>
-              <th colspan="2" style="border:1px solid #000000; padding:4px;">IDENTITAS SUAMI</th>
-              <th colspan="2" style="border:1px solid #000000; padding:4px;">ALAMAT DOMISILI</th>
-              <th colspan="2" style="border:1px solid #000000; padding:4px;">JUMLAH ANAK HIDUP</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">UMUR ANAK TERKECIL</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">STATUS PESERTA KB</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">METODE KONTRASEPSI</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">SUMBER ALOKON</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">JENIS TINDAKAN</th>
-              <th colspan="3" style="border:1px solid #000000; padding:4px;">PENAPISAN / PEMERIKSAAN MEDIS</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">EFEK SAMPING / KOMPLIKASI</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">RUJUKAN</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">PEMBERI PELAYANAN / PARAF</th>
+            <tr style="text-align:center; font-weight:bold;">
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">NO.</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">TANGGAL</th>
+              <th colspan="21" style="border:1px solid #000000; padding:4px;">PESERTA KB</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">STATUS PESERTA KB (Kode)</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">INFORMED CONSENT</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PASCA PERSALINAN</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PASCA KEGUGURAN</th>
+              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">JENIS TINDAKAN (Kode)</th>
+              <th colspan="2" rowspan="2" style="border:1px solid #000000; padding:4px;">Kasus (Kode)</th>
+              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">PENGGUNAAN ASURANSI</th>
+              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">SUMBER ALOKON</th>
+              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PELAYANAN BERGERAK</th>
             </tr>
-            <tr style="background-color:#f1f5f9; text-align:center; font-weight:bold;">
-              <th style="border:1px solid #000000; padding:4px;">NIK Istri (16 Digit)</th>
-              <th style="border:1px solid #000000; padding:4px;">Nama Lengkap Istri</th>
-              <th style="border:1px solid #000000; padding:4px;">Umur</th>
-              <th style="border:1px solid #000000; padding:4px;">Nama Suami</th>
-              <th style="border:1px solid #000000; padding:4px;">NIK Suami</th>
-              <th style="border:1px solid #000000; padding:4px;">Desa</th>
-              <th style="border:1px solid #000000; padding:4px;">RT/RW / Alamat</th>
-              <th style="border:1px solid #000000; padding:4px;">L</th>
-              <th style="border:1px solid #000000; padding:4px;">P</th>
-              <th style="border:1px solid #000000; padding:4px;">TD</th>
-              <th style="border:1px solid #000000; padding:4px;">BB</th>
-              <th style="border:1px solid #000000; padding:4px;">HPHT</th>
+            <tr style="text-align:center; font-weight:bold;">
+              <th rowspan="2" style="border:1px solid #000000; padding:4px;">NAMA SUAMI</th>
+              <th colspan="18" style="border:1px solid #000000; padding:4px;">ISTRI</th>
+              <th rowspan="2" style="border:1px solid #000000; padding:4px;">ALAMAT</th>
+              <th rowspan="2" style="border:1px solid #000000; padding:4px;">NO. HANDPHONE</th>
             </tr>
-            <tr style="background-color:#f8fafc; text-align:center; font-family:Consolas,monospace; font-size:8pt;">
-              <th style="border:1px solid #000000; padding:2px;">(1)</th>
-              <th style="border:1px solid #000000; padding:2px;">(2)</th>
-              <th style="border:1px solid #000000; padding:2px;">(3)</th>
-              <th style="border:1px solid #000000; padding:2px;">(4)</th>
-              <th style="border:1px solid #000000; padding:2px;">(5)</th>
-              <th style="border:1px solid #000000; padding:2px;">(6)</th>
-              <th style="border:1px solid #000000; padding:2px;">(7)</th>
-              <th style="border:1px solid #000000; padding:2px;">(8)</th>
-              <th style="border:1px solid #000000; padding:2px;">(9)</th>
-              <th style="border:1px solid #000000; padding:2px;">(10)</th>
-              <th style="border:1px solid #000000; padding:2px;">(11)</th>
-              <th style="border:1px solid #000000; padding:2px;">(12)</th>
-              <th style="border:1px solid #000000; padding:2px;">(13)</th>
-              <th style="border:1px solid #000000; padding:2px;">(14)</th>
-              <th style="border:1px solid #000000; padding:2px;">(15)</th>
-              <th style="border:1px solid #000000; padding:2px;">(16)</th>
-              <th style="border:1px solid #000000; padding:2px;">(17)</th>
-              <th style="border:1px solid #000000; padding:2px;">(18)</th>
-              <th style="border:1px solid #000000; padding:2px;">(19)</th>
-              <th style="border:1px solid #000000; padding:2px;">(20)</th>
-              <th style="border:1px solid #000000; padding:2px;">(21)</th>
-              <th style="border:1px solid #000000; padding:2px;">(22)</th>
-              <th style="border:1px solid #000000; padding:2px;">(23)</th>
+            <tr style="text-align:center; font-weight:bold;">
+              <th colspan="16" style="border:1px solid #000000; padding:4px;">NIK (NOMOR INDUK KEPENDUDUKAN)</th>
+              <th style="border:1px solid #000000; padding:4px;">NAMA</th>
+              <th style="border:1px solid #000000; padding:4px;">TANGGAL LAHIR</th>
+              <th style="border:1px solid #000000; padding:4px;">OPERATIF / PEMBERIAN / PEMASANGAN</th>
+              <th style="border:1px solid #000000; padding:4px;">PENCABUTAN DAN PEMASANGAN</th>
+              <th style="border:1px solid #000000; padding:4px;">PENCABUTAN</th>
+              <th style="border:1px solid #000000; padding:4px;">KOMPLIKASI BERAT</th>
+              <th style="border:1px solid #000000; padding:4px;">KEGAGALAN</th>
+              <th style="border:1px solid #000000; padding:4px;">BPJS KESEHATAN</th>
+              <th style="border:1px solid #000000; padding:4px;">LAINNYA</th>
+              <th style="border:1px solid #000000; padding:4px;">TIDAK</th>
+              <th style="border:1px solid #000000; padding:4px;">APBN</th>
+              <th style="border:1px solid #000000; padding:4px;">APBD</th>
+              <th style="border:1px solid #000000; padding:4px;">MANDIRI</th>
             </tr>
           </thead>
           <tbody>
             ${rowsHtml}
           </tbody>
-          <tfoot>
-            <tr style="background-color:#e2e8f0; font-weight:bold; text-align:center;">
-              <td colspan="10" style="border:1px solid #000000; padding:5px; text-align:right;">
-                JUMLAH TOTAL : ${summary.total} PASIEN
-              </td>
-              <td style="border:1px solid #000000; padding:5px; font-family:Consolas,monospace;">${summary.totalAnakL}</td>
-              <td style="border:1px solid #000000; padding:5px; font-family:Consolas,monospace;">${summary.totalAnakP}</td>
-              <td style="border:1px solid #000000; padding:5px;">-</td>
-              <td style="border:1px solid #000000; padding:5px;">
-                Baru: ${summary.totalBaru} | Ganti: ${summary.totalGantiCara} | Ulang: ${summary.totalUlangan}
-              </td>
-              <td style="border:1px solid #000000; padding:5px;">${summary.total} Akseptor</td>
-              <td style="border:1px solid #000000; padding:5px;">APBN: ${summary.totalApbn}</td>
-              <td colspan="7" style="border:1px solid #000000; padding:5px; text-align:left;">
-                Sumber Data: Buku Register Pelayanan KB
-              </td>
-            </tr>
-          </tfoot>
         </table>
       </body>
       </html>
@@ -285,8 +169,7 @@ export const PrintRegisterModal: React.FC<PrintRegisterModalProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const monthStr = filterMonth !== 0 ? monthNames[filterMonth - 1] : 'Semua_Bulan';
-    link.download = `Register_Pelayanan_KB_${monthStr}_${filterYear}.xls`;
+    link.download = `Register_RIKB20_${filterYear || 2026}.xls`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -294,318 +177,450 @@ export const PrintRegisterModal: React.FC<PrintRegisterModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs overflow-y-auto animate-fade-in">
-      <div className="w-full max-w-[95vw] lg:max-w-7xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2">
-        {/* Modal Action Bar (hidden on print) */}
-        <div className="bg-slate-900 text-white p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <div className="flex items-center space-x-2">
-            <Printer className="w-5 h-5 text-emerald-400" />
-            <div>
-              <h3 className="text-sm font-bold">Cetak / Simpan PDF Register Pelayanan KB Dinas P3AKB Bojonegoro</h3>
-              <p className="text-[11px] text-slate-400">
-                Format Resmi BKKBN (Dinas Pemberdayaan Perempuan, Perlindungan Anak dan KB)
-              </p>
+    <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs overflow-y-auto flex flex-col items-center p-2 sm:p-6 print:p-0 print:bg-white print:static">
+      {/* Top Action Control Bar */}
+      <div className="w-full max-w-7xl bg-slate-900 text-white rounded-2xl p-4 mb-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl border border-slate-700 print:hidden">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full">
+            Pratinjau Cetak R/I/KB/20 (Landscape)
+          </span>
+          <h2 className="text-base font-bold mt-1">
+            Cetak / Simpan PDF Register Pelayanan KB (24 Kolom Resmi)
+          </h2>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(Number(e.target.value))}
+            className="text-xs bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 font-medium"
+          >
+            <option value={0}>Semua Bulan</option>
+            {monthNames.map((m, idx) => (
+              <option key={idx + 1} value={idx + 1}>
+                Bulan: {m}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filterYear}
+            onChange={(e) => setFilterYear(Number(e.target.value))}
+            className="text-xs bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 font-medium"
+          >
+            <option value={0}>Semua Tahun</option>
+            <option value={2026}>2026</option>
+            <option value={2025}>2025</option>
+            <option value={2024}>2024</option>
+          </select>
+
+          <select
+            value={filterVillage}
+            onChange={(e) => setFilterVillage(e.target.value)}
+            disabled={villages.length === 1}
+            className="text-xs bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 font-medium disabled:opacity-80"
+          >
+            {villages.length !== 1 && <option value="SEMUA">Semua Desa</option>}
+            {villages.map((v) => (
+              <option key={v.id} value={v.name}>
+                Desa {v.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={handleDownloadExcel}
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 border border-emerald-600 rounded-xl text-xs font-bold transition cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            <span>Unduh Excel (.xls)</span>
+          </button>
+
+          <button
+            onClick={handlePrintNow}
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-extrabold transition shadow-md cursor-pointer"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Cetak / Simpan PDF</span>
+          </button>
+
+          <button
+            onClick={onClose}
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Printable Sheet (R/I/KB/20) */}
+      <div className="w-full max-w-7xl bg-white text-slate-950 p-6 sm:p-8 rounded-xl shadow-2xl print:shadow-none print:p-0 print:w-full overflow-x-auto">
+        {/* KOP FORMULIR R/I/KB/20 */}
+        <div className="flex items-end justify-between gap-4 pb-3 text-xs">
+          <div className="space-y-2">
+            <div className="border border-slate-900 px-3 py-1.5 w-44 text-[11px] leading-tight">
+              1. Petugas Entri
+              <br />
+              Data
+            </div>
+            <div className="flex items-baseline space-x-2 text-xs">
+              <span className="font-semibold uppercase leading-tight">
+                NAMA FASKES/
+                <br />
+                JARINGAN/JEJARING
+              </span>
+              <span>:</span>
+              <span className="border-b border-slate-900 px-2 pb-0.5 min-w-[180px] font-semibold">
+                {faskesDisplayName}
+              </span>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <select
-              value={filterVillage}
-              onChange={(e) => setFilterVillage(e.target.value)}
-              className="py-1.5 px-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none"
-            >
-              <option value="SEMUA">Semua Desa</option>
-              {villages.map((v) => (
-                <option key={v.id} value={v.name}>
-                  Desa {v.name}
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-col items-center">
+            <h1 className="text-xl font-normal uppercase tracking-wide mb-2">
+              REGISTER PELAYANAN KB
+            </h1>
+            <div className="flex items-start gap-2 text-center font-mono text-xs">
+              <div>
+                <div className="flex border border-slate-900">
+                  <span className="w-6 h-6 flex items-center justify-center border-r border-slate-900 font-bold">
+                    3
+                  </span>
+                  <span className="w-6 h-6 flex items-center justify-center font-bold">5</span>
+                </div>
+                <span className="text-[9px] font-sans block mt-0.5">Kode Provinsi</span>
+              </div>
+              <div>
+                <div className="flex border border-slate-900">
+                  <span className="w-6 h-6 flex items-center justify-center border-r border-slate-900 font-bold">
+                    2
+                  </span>
+                  <span className="w-6 h-6 flex items-center justify-center font-bold">2</span>
+                </div>
+                <span className="text-[9px] font-sans block mt-0.5 leading-tight">
+                  Kode
+                  <br />
+                  Kabupaten/Kota
+                </span>
+              </div>
+              <div>
+                <div className="flex border border-slate-900">
+                  <span className="w-6 h-6 flex items-center justify-center border-r border-slate-900 font-bold">
+                    0
+                  </span>
+                  <span className="w-6 h-6 flex items-center justify-center border-r border-slate-900 font-bold">
+                    0
+                  </span>
+                  <span className="w-6 h-6 flex items-center justify-center font-bold">4</span>
+                </div>
+                <span className="text-[9px] font-sans block mt-0.5">No. Register Faskes</span>
+              </div>
+              <div>
+                <div className="flex border border-slate-900">
+                  <span className="w-6 h-6 flex items-center justify-center border-r border-slate-900 font-bold">
+                    0
+                  </span>
+                  <span className="w-6 h-6 flex items-center justify-center font-bold">2</span>
+                </div>
+                <span className="text-[9px] font-sans block mt-0.5 leading-tight">
+                  No. Jaringan/
+                  <br />
+                  Jejaring Faskes
+                </span>
+              </div>
+            </div>
+          </div>
 
-            <select
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(Number(e.target.value))}
-              className="py-1.5 px-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none"
-            >
-              <option value={0}>Semua Bulan</option>
-              {monthNames.map((m, idx) => (
-                <option key={idx + 1} value={idx + 1}>
-                  Bulan {m}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filterYear}
-              onChange={(e) => setFilterYear(Number(e.target.value))}
-              className="py-1.5 px-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none"
-            >
-              <option value={2026}>2026</option>
-              <option value={2025}>2025</option>
-              <option value={2024}>2024</option>
-            </select>
-
-            <button
-              onClick={handleDownloadExcel}
-              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-emerald-300 font-bold rounded-lg transition flex items-center space-x-1.5 cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download Excel</span>
-            </button>
-
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition flex items-center space-x-1.5 shadow-sm cursor-pointer"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Cetak / Simpan PDF</span>
-            </button>
-
-            <button
-              onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          <div className="flex flex-col items-end space-y-2">
+            <div className="flex items-end space-x-4">
+              <div className="bg-black text-white font-bold px-3 py-1 text-xs">R/I/KB/20</div>
+              <div className="text-[11px]">
+                Lembar <span className="border-b border-slate-900 px-3">1</span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-1.5 text-[11px]">
+              <span>Bulan :</span>
+              <div className="border border-slate-900 text-[10px] font-mono">
+                <div className="grid grid-cols-6 border-b border-slate-900">
+                  {[1, 2, 3, 4, 5, 6].map((m) => (
+                    <span
+                      key={m}
+                      className="w-5 h-4 flex items-center justify-center border-r last:border-r-0 border-slate-900"
+                    >
+                      {filterMonth === m ? 'V' : m}
+                    </span>
+                  ))}
+                </div>
+                <div className="grid grid-cols-6">
+                  {[7, 8, 9, 10, 11, 12].map((m) => (
+                    <span
+                      key={m}
+                      className="w-5 h-4 flex items-center justify-center border-r last:border-r-0 border-slate-900 font-bold"
+                    >
+                      {filterMonth === m || (filterMonth === 0 && m === 9) ? 'V' : m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="border border-slate-900 px-2.5 py-1.5 font-mono font-bold text-xs">
+                {filterYear || 2026}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* PRINTABLE OFFICIAL BKKBN CONTENT */}
-        <div className="p-4 sm:p-8 max-h-[85vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-0 font-sans text-slate-900">
-          {/* Official Document Kop */}
-          <div className="border-b-2 border-slate-900 pb-3 mb-3 text-center">
-            <div className="flex items-center justify-between text-[10px] font-mono text-slate-700 mb-2">
-              <div className="text-left">
-                <div>KODE REGISTER: <b>{facility.k0kbCode}</b></div>
-              </div>
-              <div className="px-2 py-0.5 border border-slate-900 rounded font-bold text-[10px] text-slate-950">
-                FORMULIR R/I/KB
-              </div>
-              <div className="text-right">
-                <div>PROVINSI: <b>{facility.province.toUpperCase()}</b></div>
-                <div>KABUPATEN: <b>{facility.regency.toUpperCase()}</b></div>
-                <div>DINAS P3AKB BOJONEGORO</div>
-              </div>
-            </div>
-
-            <h1 className="text-sm sm:text-base font-extrabold uppercase text-slate-950 tracking-wider">
-              REGISTER PELAYANAN KELUARGA BERENCANA DINAS P3AKB KABUPATEN BOJONEGORO
-            </h1>
-            <h2 className="text-xs font-bold uppercase text-slate-800">
-              {facility.name}
-            </h2>
-            <div className="text-[11px] text-slate-700 mt-1 font-semibold flex items-center justify-center gap-3">
-              <span>
-                Periode Laporan: <b>{filterMonth !== 0 ? monthNames[filterMonth - 1].toUpperCase() : 'SEMUA BULAN'} {filterYear}</b>
-              </span>
-              <span>•</span>
-              <span>
-                Cakupan Wilayah: <b>{filterVillage === 'SEMUA' ? 'SELURUH DESA' : `DESA ${filterVillage.toUpperCase()}`}</b>
-              </span>
-            </div>
-          </div>
-
-          {/* Official 23-Column Table Format matching PDF */}
-          <div className="overflow-x-auto print:overflow-visible">
-            <table className="w-full text-[9px] print:text-[8px] border-collapse border border-black text-slate-950 min-w-[1200px] print:min-w-full">
-              <thead>
-                {/* Header Row 1 */}
-                <tr className="bg-slate-200 print:bg-slate-100 text-center font-bold border-b border-black">
-                  <th rowSpan={2} className="border border-black p-1 w-7">
-                    NO
-                  </th>
-                  <th rowSpan={2} className="border border-black p-1 w-16">
-                    TANGGAL PELAYANAN
-                  </th>
-                  <th rowSpan={2} className="border border-black p-1 w-20">
-                    NO. REGISTER / SERI KARTU
-                  </th>
-                  <th colSpan={3} className="border border-black p-1">
-                    IDENTITAS PESERTA KB (ISTRI)
-                  </th>
-                  <th colSpan={2} className="border border-black p-1">
-                    IDENTITAS SUAMI
-                  </th>
-                  <th colSpan={2} className="border border-black p-1">
-                    ALAMAT DOMISILI
-                  </th>
-                  <th colSpan={2} className="border border-black p-1">
-                    JUMLAH ANAK HIDUP
-                  </th>
-                  <th rowSpan={2} className="border border-black p-1 w-14">
-                    UMUR ANAK TERKECIL
-                  </th>
-                  <th rowSpan={2} className="border border-black p-1 w-20">
-                    STATUS PESERTA KB
-                  </th>
-                  <th rowSpan={2} className="border border-black p-1 w-20">
-                    METODE KONTRASEPSI
-                  </th>
-                  <th rowSpan={2} className="border border-black p-1 w-14">
-                    SUMBER ALOKON
-                  </th>
-                  <th rowSpan={2} className="border border-black p-1 w-16">
-                    JENIS TINDAKAN
-                  </th>
-                  <th colSpan={3} className="border border-black p-1">
-                    PENAPISAN / PEMERIKSAAN MEDIS
-                  </th>
-                  <th rowSpan={2} className="border border-black p-1 w-16">
-                    EFEK SAMPING / KOMPLIKASI
-                  </th>
-                  <th rowSpan={2} className="border border-black p-1 w-12">
-                    RUJUKAN
-                  </th>
-                  <th rowSpan={2} className="border border-black p-1 w-24">
-                    PEMBERI PELAYANAN / PARAF
-                  </th>
+        {/* 24-COLUMN TABLE */}
+        <table className="w-full text-left text-[10px] border-collapse border border-slate-900 text-slate-950">
+          <thead>
+            <tr className="text-center font-normal">
+              <th rowSpan={3} className="border border-slate-900 p-1 w-7">
+                NO.
+              </th>
+              <th rowSpan={3} className="border border-slate-900 p-1 w-18">
+                TANGGAL
+              </th>
+              <th colSpan={21} className="border border-slate-900 p-1">
+                PESERTA KB
+              </th>
+              <th rowSpan={3} className="border border-slate-900 p-1 w-8">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto text-[9px] leading-tight py-1">
+                  STATUS PESERTA KB (Kode)
+                </div>
+              </th>
+              <th rowSpan={3} className="border border-slate-900 p-1 w-7">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto text-[9px] leading-tight py-1">
+                  INFORMED CONSENT
+                </div>
+              </th>
+              <th rowSpan={3} className="border border-slate-900 p-1 w-7">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto text-[9px] leading-tight py-1">
+                  PASCA PERSALINAN
+                </div>
+              </th>
+              <th rowSpan={3} className="border border-slate-900 p-1 w-7">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto text-[9px] leading-tight py-1">
+                  PASCA KEGUGURAN
+                </div>
+              </th>
+              <th colSpan={3} rowSpan={2} className="border border-slate-900 p-1">
+                JENIS TINDAKAN
+                <br />
+                (Kode)
+              </th>
+              <th colSpan={2} rowSpan={2} className="border border-slate-900 p-1">
+                Kasus
+                <br />
+                (Kode)
+              </th>
+              <th colSpan={3} rowSpan={2} className="border border-slate-900 p-1">
+                PENGGUNAAN
+                <br />
+                ASURANSI
+              </th>
+              <th colSpan={3} rowSpan={2} className="border border-slate-900 p-1">
+                SUMBER ALOKON
+              </th>
+              <th rowSpan={3} className="border border-slate-900 p-1 w-7">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto text-[9px] leading-tight py-1">
+                  PELAYANAN BERGERAK
+                </div>
+              </th>
+            </tr>
+            <tr className="text-center font-normal">
+              <th rowSpan={2} className="border border-slate-900 p-1">
+                NAMA SUAMI
+              </th>
+              <th colSpan={18} className="border border-slate-900 p-1">
+                ISTRI
+              </th>
+              <th rowSpan={2} className="border border-slate-900 p-1">
+                ALAMAT
+              </th>
+              <th rowSpan={2} className="border border-slate-900 p-1">
+                NO. HANDPHONE
+              </th>
+            </tr>
+            <tr className="text-center font-normal text-[9px]">
+              <th colSpan={16} className="border border-slate-900 p-1">
+                NIK (NOMOR INDUK KEPENDUDUKAN)
+              </th>
+              <th className="border border-slate-900 p-1">NAMA</th>
+              <th className="border border-slate-900 p-1">
+                TANGGAL
+                <br />
+                LAHIR
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  OPERATIF / PEMBERIAN / PEMASANGAN
+                </div>
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  PENCABUTAN DAN PEMASANGAN
+                </div>
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  PENCABUTAN
+                </div>
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  KOMPLIKASI BERAT
+                </div>
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  KEGAGALAN
+                </div>
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  BPJS KESEHATAN
+                </div>
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  LAINNYA
+                </div>
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  TIDAK
+                </div>
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  APBN
+                </div>
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  APBD
+                </div>
+              </th>
+              <th className="border border-slate-900 p-1">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto leading-tight py-1">
+                  MANDIRI
+                </div>
+              </th>
+            </tr>
+            <tr className="text-center text-[9px] font-normal">
+              <th className="border border-slate-900 py-0.5">1</th>
+              <th className="border border-slate-900 py-0.5">2</th>
+              <th className="border border-slate-900 py-0.5">3</th>
+              <th colSpan={16} className="border border-slate-900 py-0.5">
+                4
+              </th>
+              <th className="border border-slate-900 py-0.5">5</th>
+              <th className="border border-slate-900 py-0.5">6</th>
+              <th className="border border-slate-900 py-0.5">7</th>
+              <th className="border border-slate-900 py-0.5">8</th>
+              <th className="border border-slate-900 py-0.5">9</th>
+              <th className="border border-slate-900 py-0.5">10</th>
+              <th className="border border-slate-900 py-0.5">11</th>
+              <th className="border border-slate-900 py-0.5">12</th>
+              <th className="border border-slate-900 py-0.5">13</th>
+              <th className="border border-slate-900 py-0.5">14</th>
+              <th className="border border-slate-900 py-0.5">15</th>
+              <th className="border border-slate-900 py-0.5">16</th>
+              <th className="border border-slate-900 py-0.5">17</th>
+              <th className="border border-slate-900 py-0.5">18</th>
+              <th className="border border-slate-900 py-0.5">19</th>
+              <th className="border border-slate-900 py-0.5">20</th>
+              <th className="border border-slate-900 py-0.5">21</th>
+              <th className="border border-slate-900 py-0.5">22</th>
+              <th className="border border-slate-900 py-0.5">23</th>
+              <th className="border border-slate-900 py-0.5">24</th>
+            </tr>
+          </thead>
+          <tbody>
+            {printableRecords.map((r, index) => {
+              const d = deriveR1KBRow(r);
+              return (
+                <tr key={r.id}>
+                  <td className="border border-slate-900 p-1 text-center">{index + 1}</td>
+                  <td className="border border-slate-900 p-1 text-center whitespace-nowrap">
+                    {d.tanggalFormatted}
+                  </td>
+                  <td className="border border-slate-900 p-1 uppercase">{d.husbandName}</td>
+                  {d.nikDigits.map((digit, dIdx) => (
+                    <td
+                      key={dIdx}
+                      className="border border-slate-900 px-0.5 py-1 text-center font-mono text-[9px] w-3.5"
+                    >
+                      {digit}
+                    </td>
+                  ))}
+                  <td className="border border-slate-900 p-1 uppercase">{d.wifeName}</td>
+                  <td className="border border-slate-900 p-1 text-center whitespace-nowrap">
+                    {d.wifeDobFormatted}
+                  </td>
+                  <td className="border border-slate-900 p-1 uppercase">{d.alamat}</td>
+                  <td className="border border-slate-900 p-1 text-center font-mono">{d.phone}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col9}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col10}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col11}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col12}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col13}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col14}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col15}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col16}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col17}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col18}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col19}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col20}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col21}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col22}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col23}</td>
+                  <td className="border border-slate-900 p-1 text-center">{d.col24}</td>
                 </tr>
+              );
+            })}
+          </tbody>
+        </table>
 
-                {/* Header Row 2 */}
-                <tr className="bg-slate-100 print:bg-slate-50 text-center font-bold text-[8.5px] print:text-[7.5px] border-b border-black">
-                  <th className="border border-black p-1 w-28">NIK Istri (16 Digit)</th>
-                  <th className="border border-black p-1 w-28">Nama Lengkap Istri</th>
-                  <th className="border border-black p-1 w-10">Umur</th>
-                  <th className="border border-black p-1 w-24">Nama Suami</th>
-                  <th className="border border-black p-1 w-28">NIK Suami</th>
-                  <th className="border border-black p-1 w-20">Desa</th>
-                  <th className="border border-black p-1 w-28">RT/RW / Alamat</th>
-                  <th className="border border-black p-1 w-7">L</th>
-                  <th className="border border-black p-1 w-7">P</th>
-                  <th className="border border-black p-1 w-14">TD</th>
-                  <th className="border border-black p-1 w-10">BB</th>
-                  <th className="border border-black p-1 w-14">HPHT</th>
-                </tr>
-
-                {/* Header Row 3: Column Numbers */}
-                <tr className="bg-slate-50 text-center text-[7.5px] font-mono border-b border-black">
-                  <th className="border border-black p-0.5">(1)</th>
-                  <th className="border border-black p-0.5">(2)</th>
-                  <th className="border border-black p-0.5">(3)</th>
-                  <th className="border border-black p-0.5">(4)</th>
-                  <th className="border border-black p-0.5">(5)</th>
-                  <th className="border border-black p-0.5">(6)</th>
-                  <th className="border border-black p-0.5">(7)</th>
-                  <th className="border border-black p-0.5">(8)</th>
-                  <th className="border border-black p-0.5">(9)</th>
-                  <th className="border border-black p-0.5">(10)</th>
-                  <th className="border border-black p-0.5">(11)</th>
-                  <th className="border border-black p-0.5">(12)</th>
-                  <th className="border border-black p-0.5">(13)</th>
-                  <th className="border border-black p-0.5">(14)</th>
-                  <th className="border border-black p-0.5">(15)</th>
-                  <th className="border border-black p-0.5">(16)</th>
-                  <th className="border border-black p-0.5">(17)</th>
-                  <th className="border border-black p-0.5">(18)</th>
-                  <th className="border border-black p-0.5">(19)</th>
-                  <th className="border border-black p-0.5">(20)</th>
-                  <th className="border border-black p-0.5">(21)</th>
-                  <th className="border border-black p-0.5">(22)</th>
-                  <th className="border border-black p-0.5">(23)</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {printableRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan={23} className="border border-black p-4 text-center text-slate-500 font-sans">
-                      Tidak ada data pelayanan akseptor KB pada periode dan wilayah ini.
-                    </td>
-                  </tr>
-                ) : (
-                  printableRecords.map((r, i) => (
-                    <tr key={r.id} className="text-center font-sans">
-                      {/* (1) */}
-                      <td className="border border-black p-1 font-mono">{i + 1}</td>
-                      {/* (2) */}
-                      <td className="border border-black p-1 whitespace-nowrap font-mono">{r.serviceDate}</td>
-                      {/* (3) */}
-                      <td className="border border-black p-1 font-mono font-bold whitespace-nowrap">{r.registerNumber}</td>
-                      {/* (4) */}
-                      <td className="border border-black p-1 font-mono tracking-tight whitespace-nowrap">{r.wifeNik || '-'}</td>
-                      {/* (5) */}
-                      <td className="border border-black p-1 text-left font-bold">{r.wifeName}</td>
-                      {/* (6) */}
-                      <td className="border border-black p-1 font-mono">{r.wifeAge}</td>
-                      {/* (7) */}
-                      <td className="border border-black p-1 text-left">{r.husbandName || '-'}</td>
-                      {/* (8) */}
-                      <td className="border border-black p-1 font-mono text-[8px] whitespace-nowrap">{r.husbandNik || '-'}</td>
-                      {/* (9) */}
-                      <td className="border border-black p-1 text-left">Desa {r.village}</td>
-                      {/* (10) */}
-                      <td className="border border-black p-1 text-left text-[8px] truncate max-w-[120px]" title={r.address}>
-                        {r.address}
-                      </td>
-                      {/* (11) */}
-                      <td className="border border-black p-1 font-mono">{r.aliveChildrenMale}</td>
-                      {/* (12) */}
-                      <td className="border border-black p-1 font-mono">{r.aliveChildrenFemale}</td>
-                      {/* (13) */}
-                      <td className="border border-black p-1 font-mono text-[8px]">
-                        {r.youngestChildAgeMonths > 0 ? `${r.youngestChildAgeMonths} bln` : '-'}
-                      </td>
-                      {/* (14) */}
-                      <td className="border border-black p-1 text-[8px] font-semibold whitespace-nowrap">
-                        {getStatusLabelText(r.participantStatus)}
-                      </td>
-                      {/* (15) */}
-                      <td className="border border-black p-1 font-bold whitespace-nowrap">
-                        {METHOD_SHORT_LABELS[r.method] || r.method}
-                      </td>
-                      {/* (16) */}
-                      <td className="border border-black p-1 text-[8px]">{r.alokonSource}</td>
-                      {/* (17) */}
-                      <td className="border border-black p-1 text-[8px]">
-                        {ACTION_LABELS[r.actionType] || r.actionType}
-                      </td>
-                      {/* (18) */}
-                      <td className="border border-black p-1 font-mono text-[8px] whitespace-nowrap">{r.bloodPressure || '-'}</td>
-                      {/* (19) */}
-                      <td className="border border-black p-1 font-mono text-[8px]">{r.weightKg > 0 ? r.weightKg : '-'}</td>
-                      {/* (20) */}
-                      <td className="border border-black p-1 font-mono text-[8px] whitespace-nowrap">{r.hpht || '-'}</td>
-                      {/* (21) */}
-                      <td className="border border-black p-1 text-[8px]">
-                        {r.complications && r.complications !== 'Tidak Ada'
-                          ? r.complications
-                          : r.sideEffects && r.sideEffects !== 'Tidak Ada'
-                          ? r.sideEffects
-                          : '-'}
-                      </td>
-                      {/* (22) */}
-                      <td className="border border-black p-1 text-[8px]">{r.referralStatus === 'TIDAK' ? 'Tidak' : 'Rujuk'}</td>
-                      {/* (23) */}
-                      <td className="border border-black p-1 text-left text-[8px] truncate max-w-[90px]" title={r.officerName}>
-                        {r.officerName}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-
-              {/* Total Summary Footer Row */}
-              {printableRecords.length > 0 && (
-                <tfoot>
-                  <tr className="bg-slate-200 print:bg-slate-100 font-bold border-t-2 border-black text-center">
-                    <td colSpan={10} className="border border-black p-1 text-right uppercase">
-                      JUMLAH TOTAL : {summary.total} PASIEN
-                    </td>
-                    <td className="border border-black p-1 font-mono">{summary.totalAnakL}</td>
-                    <td className="border border-black p-1 font-mono">{summary.totalAnakP}</td>
-                    <td className="border border-black p-1">-</td>
-                    <td className="border border-black p-1 text-[8px]">
-                      Baru: {summary.totalBaru} | Ganti: {summary.totalGantiCara} | Ulang: {summary.totalUlangan}
-                    </td>
-                    <td className="border border-black p-1 text-[8px]">{summary.total} Akseptor</td>
-                    <td className="border border-black p-1 text-[8px]">APBN: {summary.totalApbn}</td>
-                    <td colSpan={7} className="border border-black p-1 text-left text-[8px]">
-                      Sumber Data: Buku Register Pelayanan KB
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
+        {/* KETERANGAN KODE */}
+        <div className="pt-3 space-y-1.5 text-[10px] text-slate-950">
+          <div>1) Keterangan Kode</div>
+          <table className="border-collapse border border-slate-900 text-[9.5px] w-full max-w-5xl">
+            <thead>
+              <tr className="text-center font-medium">
+                <th colSpan={2} className="border border-slate-900 py-1 px-2 w-1/3">
+                  STATUS PESERTA KB
+                </th>
+                <th colSpan={6} className="border border-slate-900 py-1 px-2">
+                  KODE JENIS ALOKON (Diisi Pada Jenis Tindakan dan Kasus)
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border-l border-slate-900 py-0.5 px-2">1 : Peserta KB Baru</td>
+                <td className="border-r border-slate-900 py-0.5 px-2">3 : Peserta KB Ulangan</td>
+                <td className="py-0.5 px-2">1 : Suntikan 1 Bulanan</td>
+                <td className="py-0.5 px-2">3 : Suntikan 3 Bulanan</td>
+                <td className="py-0.5 px-2">5 : Pil Progestin</td>
+                <td className="py-0.5 px-2">7 : Implan 1 Batang</td>
+                <td className="py-0.5 px-2">9 : IUD</td>
+                <td className="border-r border-slate-900 py-0.5 px-2">11 : Tubektomi</td>
+              </tr>
+              <tr className="border-b border-slate-900">
+                <td className="border-l border-slate-900 py-0.5 px-2">2 : Peserta KB Ganti</td>
+                <td className="border-r border-slate-900 py-0.5 px-2">4 : Komplikasi</td>
+                <td className="py-0.5 px-2">2 : Suntikan 3 Bulanan</td>
+                <td className="py-0.5 px-2">4 : Pil Kombinasi</td>
+                <td className="py-0.5 px-2">6 : Kondom</td>
+                <td className="py-0.5 px-2">8 : Implan 2 Batang</td>
+                <td className="py-0.5 px-2" colSpan={2}>
+                  10 : Vasektomi
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div>
+            2) SELAIN STATUS PESERTA KB, JENIS TINDAKAN DAN KASUS DIISI TANDA CENTANG (V)
           </div>
         </div>
       </div>

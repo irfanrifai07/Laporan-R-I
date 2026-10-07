@@ -90,32 +90,48 @@ export type ServicePlace =
 
 export interface PatientRecord {
   id: string;
-  serviceDate: string; // YYYY-MM-DD
+  serviceDate: string; // YYYY-MM-DD (Kolom 2)
   registerNumber: string;
-  wifeNik: string;
-  wifeName: string;
-  wifeDob: string; // YYYY-MM-DD
+  wifeNik: string; // 16 digit NIK Istri (Kolom 4)
+  wifeName: string; // Nama Istri (Kolom 5)
+  wifeDob: string; // YYYY-MM-DD Tanggal Lahir Istri (Kolom 6)
   wifeAge: number;
   husbandNik: string;
-  husbandName: string;
+  husbandName: string; // Nama Suami (Kolom 3)
   bpjsNumber: string;
-  address: string;
+  address: string; // Alamat (Kolom 7)
+  phone?: string; // No. Handphone (Kolom 8)
   village: string;
   district: string;
   aliveChildrenMale: number;
   aliveChildrenFemale: number;
   youngestChildAgeMonths: number;
   participantStatus: ParticipantStatus;
+  // Kolom 9-24 sesuai Formulir R/I/KB/20 Resmi:
+  statusPesertaKode?: 1 | 2 | 3 | 4; // Kolom 9: 1=Baru, 2=Ganti, 3=Ulangan, 4=Komplikasi
+  informedConsent?: boolean; // Kolom 10: 1 / 0
+  pascaPersalinan?: boolean; // Kolom 11: 1 / 0
+  pascaKeguguran?: boolean; // Kolom 12: 1 / 0
+  jenisTindakanKategori?: 'PEMASANGAN' | 'CABUT_PASANG' | 'PENCABUTAN'; // Kolom 13, 14, 15
+  alokonKode?: number; // Kode Jenis Alokon 1 s/d 11
+  tindakanPemasanganKode?: number | string; // Kolom 13: Operatif/Pemberian/Pemasangan
+  tindakanCabutPasangKode?: number | string; // Kolom 14: Pencabutan dan Pemasangan
+  tindakanPencabutanKode?: number | string; // Kolom 15: Pencabutan
+  kasusKomplikasiKode?: number | string; // Kolom 16: Kasus Komplikasi Berat (Kode Alokon)
+  kasusKegagalanKode?: number | string; // Kolom 17: Kasus Kegagalan (Kode Alokon)
+  penggunaanAsuransi?: 'BPJS' | 'LAINNYA' | 'TIDAK'; // Kolom 18, 19, 20
+  pelayananBergerak?: boolean; // Kolom 24: 1 / 0
+  faskesJaringanNama?: string; // Nama Faskes/Jaringan/Jejaring (contoh: Pustu Trenggulunan)
   previousMethod?: ContraceptiveMethod | string;
   method: ContraceptiveMethod;
-  alokonSource: AlokonSource;
+  alokonSource: AlokonSource; // Kolom 21 (APBN), 22 (APBD/NON_APBN), 23 (MANDIRI)
   actionType: ActionType;
-  bloodPressure: string; // e.g. "120/80"
+  bloodPressure: string;
   weightKg: number;
-  hpht?: string; // Hari Pertama Haid Terakhir
+  hpht?: string;
   medicalNotes?: string;
-  sideEffects: string; // "Tidak Ada", "Spotting/Bercak", "Amenorea", etc.
-  complications: string; // "Tidak Ada", "Infeksi", "Ekspulsi IUD", etc.
+  sideEffects: string;
+  complications: string;
   referralStatus: 'TIDAK' | 'DIRUJUK_RS' | 'DIRUJUK_FKTP';
   servicePlace: ServicePlace;
   officerName: string;

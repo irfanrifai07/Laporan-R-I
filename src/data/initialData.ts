@@ -60,6 +60,186 @@ export const SERVICE_PLACE_LABELS: Record<string, string> = {
   MOBIL_PELAYANAN: 'Mobil Pelayanan KB (Muyan)',
 };
 
+// Keterangan Kode R/I/KB/20 Resmi BKKBN
+export const STATUS_PESERTA_KODE_LABELS: Record<number, string> = {
+  1: '1 : Peserta KB Baru',
+  2: '2 : Peserta KB Ganti',
+  3: '3 : Peserta KB Ulangan',
+  4: '4 : Komplikasi',
+};
+
+export const ALOKON_KODE_OPTIONS: { code: number; label: string; shortLabel: string; method: ContraceptiveMethod }[] = [
+  { code: 1, label: '1 : Suntikan 1 Bulanan', shortLabel: 'Suntikan 1 Bulanan', method: 'SUNTIK_1_BLN' },
+  { code: 2, label: '2 : Suntikan 3 Bulanan Kombinasi', shortLabel: 'Suntikan 3 Bulanan', method: 'SUNTIK_3_BLN' },
+  { code: 3, label: '3 : Suntikan 3 Bulanan Progestin', shortLabel: 'Suntikan 3 Bulanan', method: 'SUNTIK_3_BLN' },
+  { code: 4, label: '4 : Pil Kombinasi', shortLabel: 'Pil Kombinasi', method: 'PIL' },
+  { code: 5, label: '5 : Pil Progestin', shortLabel: 'Pil Progestin', method: 'PIL' },
+  { code: 6, label: '6 : Kondom', shortLabel: 'Kondom', method: 'KONDOM' },
+  { code: 7, label: '7 : Implan 1 Batang', shortLabel: 'Implan 1 Batang', method: 'IMPLAN_1_BATANG' },
+  { code: 8, label: '8 : Implan 2 Batang', shortLabel: 'Implan 2 Batang', method: 'IMPLAN_2_BATANG' },
+  { code: 9, label: '9 : IUD', shortLabel: 'IUD', method: 'IUD' },
+  { code: 10, label: '10 : Vasektomi', shortLabel: 'Vasektomi', method: 'MOP' },
+  { code: 11, label: '11 : Tubektomi', shortLabel: 'Tubektomi', method: 'MOW' },
+];
+
+export function methodToDefaultAlokonKode(method: ContraceptiveMethod): number {
+  switch (method) {
+    case 'SUNTIK_1_BLN':
+      return 1;
+    case 'SUNTIK_3_BLN':
+      return 3;
+    case 'PIL':
+      return 4;
+    case 'KONDOM':
+      return 6;
+    case 'IMPLAN_1_BATANG':
+      return 7;
+    case 'IMPLAN_2_BATANG':
+      return 8;
+    case 'IUD':
+      return 9;
+    case 'MOP':
+      return 10;
+    case 'MOW':
+      return 11;
+    default:
+      return 4;
+  }
+}
+
+export function alokonKodeToMethod(code: number): ContraceptiveMethod {
+  const found = ALOKON_KODE_OPTIONS.find((o) => o.code === code);
+  return found ? found.method : 'PIL';
+}
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function formatDateR1KB(dateStr?: string): string {
+  if (!dateStr) return '-';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const [y, m, d] = parts;
+  const mIdx = parseInt(m, 10) - 1;
+  if (isNaN(mIdx) || mIdx < 0 || mIdx > 11) return dateStr;
+  return `${d.padStart(2, '0')}-${SHORT_MONTHS[mIdx]}-${y}`;
+}
+
+export function getNikDigits16(nik?: string): string[] {
+  const clean = (nik || '').replace(/\D/g, '').slice(0, 16);
+  const arr: string[] = [];
+  for (let i = 0; i < 16; i++) {
+    arr.push(clean[i] || '');
+  }
+  return arr;
+}
+
+export function deriveR1KBRow(r: PatientRecord) {
+  // Kolom 9: Status Peserta KB (Kode 1..4)
+  const statusKode =
+    r.statusPesertaKode ??
+    (r.participantStatus === 'BARU_BUKAN_PASCA' ||
+    r.participantStatus === 'BARU_PASCA_SALIN' ||
+    r.participantStatus === 'BARU_PASCA_GUGUR'
+      ? 1
+      : r.participantStatus === 'GANTI_CARA'
+      ? 2
+      : 3);
+
+  // Kolom 10: Informed Consent (1 / 0)
+  const informedConsentVal = r.informedConsent !== undefined ? (r.informedConsent ? 1 : 0) : 0;
+
+  // Kolom 11: Pasca Persalinan (1 / 0)
+  const pascaPersalinanVal =
+    r.pascaPersalinan !== undefined
+      ? r.pascaPersalinan
+        ? 1
+        : 0
+      : r.participantStatus === 'BARU_PASCA_SALIN'
+      ? 1
+      : 0;
+
+  // Kolom 12: Pasca Keguguran (1 / 0)
+  const pascaKeguguranVal =
+    r.pascaKeguguran !== undefined
+      ? r.pascaKeguguran
+        ? 1
+        : 0
+      : r.participantStatus === 'BARU_PASCA_GUGUR'
+      ? 1
+      : 0;
+
+  // Kode Jenis Alokon (1..11)
+  const defaultCode = r.alokonKode ?? methodToDefaultAlokonKode(r.method);
+
+  // Kolom 13, 14, 15: Jenis Tindakan (Kode)
+  let col13: string | number = '';
+  let col14: string | number = '';
+  let col15: string | number = '';
+
+  if (r.tindakanPemasanganKode !== undefined || r.tindakanCabutPasangKode !== undefined || r.tindakanPencabutanKode !== undefined) {
+    col13 = r.tindakanPemasanganKode ?? '';
+    col14 = r.tindakanCabutPasangKode ?? '';
+    col15 = r.tindakanPencabutanKode ?? '';
+  } else if (r.actionType === 'CABUT_PASANG') {
+    col14 = defaultCode;
+  } else if (r.actionType === 'PENCABUTAN') {
+    col15 = defaultCode;
+  } else {
+    col13 = defaultCode;
+  }
+
+  // Kolom 16, 17: Kasus (Kode)
+  const col16 = r.kasusKomplikasiKode ?? '';
+  const col17 = r.kasusKegagalanKode ?? '';
+
+  // Kolom 18, 19, 20: Penggunaan Asuransi (1 / 0)
+  const asuransiType = r.penggunaanAsuransi ?? (r.bpjsNumber ? 'BPJS' : 'BPJS');
+  const col18 = asuransiType === 'BPJS' ? 1 : 0;
+  const col19 = asuransiType === 'LAINNYA' ? 1 : 0;
+  const col20 = asuransiType === 'TIDAK' ? 1 : 0;
+
+  // Kolom 21, 22, 23: Sumber Alokon (1 / 0)
+  const col21 = r.alokonSource === 'APBN' ? 1 : 0;
+  const col22 = r.alokonSource === 'NON_APBN' ? 1 : 0;
+  const col23 = r.alokonSource === 'MANDIRI' ? 1 : 0;
+
+  // Kolom 24: Pelayanan Bergerak (1 / 0)
+  const col24 =
+    r.pelayananBergerak !== undefined
+      ? r.pelayananBergerak
+        ? 1
+        : 0
+      : r.servicePlace === 'MOBIL_PELAYANAN'
+      ? 1
+      : 0;
+
+  return {
+    tanggalFormatted: formatDateR1KB(r.serviceDate),
+    husbandName: (r.husbandName || '-').toUpperCase(),
+    nikDigits: getNikDigits16(r.wifeNik),
+    wifeName: (r.wifeName || '-').toUpperCase(),
+    wifeDobFormatted: formatDateR1KB(r.wifeDob),
+    alamat: (r.address || r.village || '-').toUpperCase(),
+    phone: r.phone || '',
+    col9: statusKode,
+    col10: informedConsentVal,
+    col11: pascaPersalinanVal,
+    col12: pascaKeguguranVal,
+    col13,
+    col14,
+    col15,
+    col16,
+    col17,
+    col18,
+    col19,
+    col20,
+    col21,
+    col22,
+    col23,
+    col24,
+  };
+}
+
 export const initialFacilityProfile: FacilityProfile = {
   name: 'DINAS PEMBERDAYAAN PEREMPUAN, PERLINDUNGAN ANAK DAN KB KABUPATEN BOJONEGORO',
   code: '35220000',
