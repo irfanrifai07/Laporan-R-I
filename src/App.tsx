@@ -145,13 +145,15 @@ export default function App() {
     testFirebaseConnection();
 
     // 2. Inisialisasi basis data awan jika belum terisi
-    FirestoreService.initializeCloudDatabase({
-      users: StorageService.getUsers(),
-      records: StorageService.getRecords(),
-      villages: StorageService.getVillages(),
-      districts: StorageService.getDistricts(),
-      facility: StorageService.getFacilityProfile(),
-    });
+    if (typeof FirestoreService.initializeCloudDatabase === 'function') {
+      FirestoreService.initializeCloudDatabase({
+        users: StorageService.getUsers(),
+        records: StorageService.getRecords(),
+        villages: StorageService.getVillages(),
+        districts: StorageService.getDistricts(),
+        facility: StorageService.getFacilityProfile(),
+      });
+    }
 
     // 3. Pasang pendengar realtime perubahan data dari perangkat lain (HP / PC)
     const unsubUsers = FirestoreService.subscribeUsers((cloudUsers) => {
@@ -159,7 +161,7 @@ export default function App() {
         StorageService.saveUsersLocallyOnly(cloudUsers);
         setUsers((prev) => (JSON.stringify(prev) === JSON.stringify(cloudUsers) ? prev : cloudUsers));
       }
-    });
+    }, StorageService.getUsers());
 
     const unsubRecords = FirestoreService.subscribeRecords((cloudRecords) => {
       if (cloudRecords) {
@@ -187,7 +189,7 @@ export default function App() {
           JSON.stringify(prev) === JSON.stringify(normalized) ? prev : normalized
         );
       }
-    });
+    }, StorageService.getDistricts());
 
     const unsubFacility = FirestoreService.subscribeFacility((cloudFac) => {
       if (cloudFac) {
@@ -196,7 +198,7 @@ export default function App() {
           JSON.stringify(prev) === JSON.stringify(cloudFac) ? prev : cloudFac
         );
       }
-    });
+    }, StorageService.getFacilityProfile());
 
     const unsubLogs = FirestoreService.subscribeLogs((cloudLogs) => {
       if (cloudLogs && cloudLogs.length > 0) {

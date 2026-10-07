@@ -105,6 +105,31 @@ let seededDistricts = false;
 let seededFacility = false;
 
 export const FirestoreService = {
+  // Inisialisasi basis data awan jika koleksi awal belum terisi
+  async initializeCloudDatabase(defaults: {
+    users: User[];
+    records: PatientRecord[];
+    villages: Village[];
+    districts: District[];
+    facility: FacilityProfile;
+  }): Promise<void> {
+    try {
+      const usersSnap = await getDocs(query(collection(db, USERS_COL), limit(1)));
+      if (usersSnap.empty && defaults.users.length > 0 && !seededUsers) {
+        seededUsers = true;
+        await this.syncAllUsers(defaults.users);
+      }
+
+      const distSnap = await getDocs(query(collection(db, DISTRICTS_COL), limit(1)));
+      if (distSnap.empty && defaults.districts.length > 0 && !seededDistricts) {
+        seededDistricts = true;
+        await this.syncAllDistricts(defaults.districts);
+      }
+    } catch (e) {
+      console.error('Error initializeCloudDatabase:', e);
+    }
+  },
+
   // Sync Realtime Users (HP & PC otomatis sinkron)
   subscribeUsers(onUpdate: (users: User[]) => void, fallbackUsers?: User[]): Unsubscribe {
     const colRef = collection(db, USERS_COL);
