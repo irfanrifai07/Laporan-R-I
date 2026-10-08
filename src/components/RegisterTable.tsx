@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { FacilityProfile, PatientRecord, User, Village } from '../types';
+import { District, FacilityProfile, PatientRecord, User, Village } from '../types';
 import {
   METHOD_SHORT_LABELS,
   ALOKON_KODE_OPTIONS,
@@ -22,6 +22,8 @@ import {
 interface RegisterTableProps {
   records: PatientRecord[];
   villages: Village[];
+  districts?: District[];
+  onSelectDistrict?: (districtName: string) => void;
   facility: FacilityProfile;
   currentUser: User | null;
   onAddNew: () => void;
@@ -34,6 +36,8 @@ interface RegisterTableProps {
 export const RegisterTable: React.FC<RegisterTableProps> = ({
   records,
   villages,
+  districts = [],
+  onSelectDistrict,
   facility,
   currentUser,
   onAddNew,
@@ -68,7 +72,7 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
     } else {
       setSelectedVillage('SEMUA');
     }
-  }, [currentUser, isUserDesa]);
+  }, [currentUser?.village, currentUser?.district, isUserDesa]);
 
   const monthNames = [
     'Januari',
@@ -226,7 +230,11 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-2.5">
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-2">
+        <div
+          className={`grid grid-cols-2 sm:grid-cols-2 ${
+            isAdminInduk ? 'lg:grid-cols-7' : 'lg:grid-cols-6'
+          } gap-2`}
+        >
           <div className="col-span-2 lg:col-span-2 relative">
             <input
               type="text"
@@ -274,17 +282,41 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
             </select>
           </div>
 
+          {isAdminInduk && (
+            <div>
+              <select
+                value={currentUser?.district || 'SEMUA'}
+                onChange={(e) => {
+                  setSelectedVillage('SEMUA');
+                  if (onSelectDistrict) onSelectDistrict(e.target.value);
+                }}
+                className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-emerald-50/70 border border-emerald-200 text-emerald-950 font-semibold rounded-xl focus:bg-white focus:outline-none"
+              >
+                <option value="SEMUA">Semua Kecamatan</option>
+                {districts.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    Kec. {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <select
               value={selectedVillage}
               onChange={(e) => setSelectedVillage(e.target.value)}
               disabled={isUserDesa}
-              className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none disabled:opacity-75"
+              className="w-full py-2.5 sm:py-2 px-2.5 text-xs bg-slate-50 border border-slate-200 font-medium rounded-xl focus:bg-white focus:outline-none disabled:opacity-75"
             >
-              {!isUserDesa && <option value="SEMUA">Semua Desa</option>}
+              {!isUserDesa && (
+                <option value="SEMUA">
+                  {currentUser?.district ? `Semua Desa (${currentUser.district})` : 'Semua Desa'}
+                </option>
+              )}
               {villages.map((v) => (
                 <option key={v.id} value={v.name}>
-                  Desa {v.name}
+                  Desa {v.name}{!currentUser?.district && v.district ? ` (${v.district})` : ''}
                 </option>
               ))}
             </select>

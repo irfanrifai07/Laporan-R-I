@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { FacilityProfile, PatientRecord, User, Village } from '../types';
+import { District, FacilityProfile, PatientRecord, User, Village } from '../types';
 import { StorageService } from '../services/storage';
-import { Printer, Calendar, FileSpreadsheet, Building2, Download } from 'lucide-react';
+import { Printer, Calendar, FileSpreadsheet, Building2, Download, MapPin } from 'lucide-react';
 
 interface RekapitulasiF2KBProps {
   facility: FacilityProfile;
   villages: Village[];
+  districts?: District[];
+  onSelectDistrict?: (districtName: string) => void;
   records?: PatientRecord[];
   currentUser?: User | null;
 }
@@ -13,11 +15,17 @@ interface RekapitulasiF2KBProps {
 export const RekapitulasiF2KB: React.FC<RekapitulasiF2KBProps> = ({
   facility,
   villages,
+  districts = [],
+  onSelectDistrict,
   records,
   currentUser,
 }) => {
   const isUserDesa =
     currentUser?.role === 'admin_desa' || currentUser?.role === 'bidan_desa';
+  const isAdminInduk =
+    currentUser?.role === 'admin_induk' ||
+    currentUser?.role === 'admin_kabupaten' ||
+    !currentUser;
   const [selectedMonth, setSelectedMonth] = useState<number>(9); // September by default
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedVillage, setSelectedVillage] = useState<string>(
@@ -30,7 +38,7 @@ export const RekapitulasiF2KB: React.FC<RekapitulasiF2KBProps> = ({
     } else {
       setSelectedVillage('SEMUA');
     }
-  }, [isUserDesa, currentUser?.village]);
+  }, [isUserDesa, currentUser?.village, currentUser?.district]);
 
   const monthNames = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -284,24 +292,47 @@ export const RekapitulasiF2KB: React.FC<RekapitulasiF2KBProps> = ({
             </select>
           </div>
 
+          {/* District selector for Admin Induk */}
+          {isAdminInduk && (
+            <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+              <Building2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <select
+                value={currentUser?.district || 'SEMUA'}
+                onChange={(e) => {
+                  setSelectedVillage('SEMUA');
+                  if (onSelectDistrict) onSelectDistrict(e.target.value);
+                }}
+                className="text-xs font-semibold bg-transparent border-none focus:outline-none text-slate-800 cursor-pointer"
+              >
+                <option value="SEMUA">Semua Kecamatan</option>
+                {districts.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    Kecamatan {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Village selector */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+          <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+            <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
             <select
               value={selectedVillage}
               onChange={(e) => setSelectedVillage(e.target.value)}
               disabled={isUserDesa}
-              className="text-xs font-medium bg-transparent border-none focus:outline-none text-slate-800 disabled:opacity-80"
+              className="text-xs font-semibold bg-transparent border-none focus:outline-none text-slate-800 disabled:opacity-80 cursor-pointer"
             >
               {!isUserDesa && (
                 <option value="SEMUA">
                   {currentUser?.district
-                    ? `Wilayah: Semua Desa (Kec. ${facility.district})`
-                    : 'Wilayah: Semua Desa (Kabupaten Bojonegoro)'}
+                    ? `Semua Desa (Kec. ${facility.district})`
+                    : 'Semua Desa (Se-Kabupaten)'}
                 </option>
               )}
               {villages.map((v) => (
                 <option key={v.id} value={v.name}>
-                  Wilayah: Desa {v.name}
+                  Desa {v.name}{!currentUser?.district && v.district ? ` (${v.district})` : ''}
                 </option>
               ))}
             </select>

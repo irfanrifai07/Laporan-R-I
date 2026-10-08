@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { FacilityProfile, PatientRecord, Village } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { District, FacilityProfile, PatientRecord, User, Village } from '../types';
 import { deriveR1KBRow, exportRegisterR1KBToExcel } from '../data/initialData';
 import { Printer, X, Download } from 'lucide-react';
 
@@ -9,6 +9,9 @@ interface PrintRegisterModalProps {
   records: PatientRecord[];
   facility: FacilityProfile;
   villages: Village[];
+  districts?: District[];
+  currentUser?: User | null;
+  onSelectDistrict?: (districtName: string) => void;
 }
 
 export const PrintRegisterModal: React.FC<PrintRegisterModalProps> = ({
@@ -17,12 +20,30 @@ export const PrintRegisterModal: React.FC<PrintRegisterModalProps> = ({
   records,
   facility,
   villages,
+  districts = [],
+  currentUser,
+  onSelectDistrict,
 }) => {
+  const isAdminInduk =
+    currentUser?.role === 'admin_induk' ||
+    currentUser?.role === 'admin_kabupaten' ||
+    !currentUser;
+  const isUserDesa =
+    currentUser?.role === 'admin_desa' || currentUser?.role === 'bidan_desa';
+
   const [filterVillage, setFilterVillage] = useState<string>(
-    villages.length === 1 ? villages[0].name : 'SEMUA'
+    isUserDesa && currentUser?.village ? currentUser.village : 'SEMUA'
   );
   const [filterMonth, setFilterMonth] = useState<number>(9); // Default September
   const [filterYear, setFilterYear] = useState<number>(2026);
+
+  useEffect(() => {
+    if (isUserDesa && currentUser?.village) {
+      setFilterVillage(currentUser.village);
+    } else {
+      setFilterVillage('SEMUA');
+    }
+  }, [isUserDesa, currentUser?.village, currentUser?.district]);
 
   const monthNames = [
     'Januari',
@@ -117,16 +138,38 @@ export const PrintRegisterModal: React.FC<PrintRegisterModalProps> = ({
             <option value={2024}>2024</option>
           </select>
 
+          {isAdminInduk && (
+            <select
+              value={currentUser?.district || 'SEMUA'}
+              onChange={(e) => {
+                setFilterVillage('SEMUA');
+                if (onSelectDistrict) onSelectDistrict(e.target.value);
+              }}
+              className="text-xs bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 font-medium"
+            >
+              <option value="SEMUA">Semua Kecamatan</option>
+              {districts.map((d) => (
+                <option key={d.id} value={d.name}>
+                  Kec. {d.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <select
             value={filterVillage}
             onChange={(e) => setFilterVillage(e.target.value)}
-            disabled={villages.length === 1}
+            disabled={isUserDesa}
             className="text-xs bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 font-medium disabled:opacity-80"
           >
-            {villages.length !== 1 && <option value="SEMUA">Semua Desa</option>}
+            {!isUserDesa && (
+              <option value="SEMUA">
+                {currentUser?.district ? `Semua Desa (${currentUser.district})` : 'Semua Desa'}
+              </option>
+            )}
             {villages.map((v) => (
               <option key={v.id} value={v.name}>
-                Desa {v.name}
+                Desa {v.name}{!currentUser?.district && v.district ? ` (${v.district})` : ''}
               </option>
             ))}
           </select>

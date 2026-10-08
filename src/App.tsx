@@ -347,6 +347,7 @@ export default function App() {
             records={scopedRecords}
             villages={scopedVillages}
             districts={districts}
+            onSelectDistrict={handleSelectDistrict}
             onUpdateDistricts={handleUpdateDistricts}
             facility={activeFacility}
             currentUser={currentUser}
@@ -361,6 +362,8 @@ export default function App() {
           <RegisterTable
             records={scopedRecords}
             villages={scopedVillages}
+            districts={districts}
+            onSelectDistrict={handleSelectDistrict}
             facility={activeFacility}
             currentUser={currentUser}
             onAddNew={handleOpenNew}
@@ -375,6 +378,8 @@ export default function App() {
           <RekapitulasiF2KB
             facility={activeFacility}
             villages={scopedVillages}
+            districts={districts}
+            onSelectDistrict={handleSelectDistrict}
             records={scopedRecords}
             currentUser={currentUser}
           />
@@ -458,6 +463,9 @@ export default function App() {
           records={scopedRecords}
           facility={activeFacility}
           villages={scopedVillages}
+          districts={districts}
+          currentUser={currentUser}
+          onSelectDistrict={handleSelectDistrict}
         />
       )}
 

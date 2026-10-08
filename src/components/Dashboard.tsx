@@ -29,6 +29,7 @@ interface DashboardProps {
   records: PatientRecord[];
   villages: Village[];
   districts?: District[];
+  onSelectDistrict?: (districtName: string) => void;
   onUpdateDistricts?: (d: District[]) => void;
   facility: FacilityProfile;
   currentUser?: User | null;
@@ -42,6 +43,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   records,
   villages,
   districts: propDistricts,
+  onSelectDistrict,
   onUpdateDistricts,
   facility,
   currentUser,
@@ -90,7 +92,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     } else {
       setSelectedVillage('SEMUA');
     }
-  }, [isBidanDesa, currentUser?.village]);
+  }, [isBidanDesa, currentUser?.village, currentUser?.district]);
 
   const monthNames = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -280,22 +282,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </select>
           </div>
 
-          {/* Pilih Wilayah */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2">
+          {/* Pilih Kecamatan (Khusus Admin Induk) */}
+          {isAdminInduk && (
+            <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2">
+              <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <select
+                value={currentUser?.district || 'SEMUA'}
+                onChange={(e) => {
+                  setSelectedVillage('SEMUA');
+                  if (onSelectDistrict) onSelectDistrict(e.target.value);
+                }}
+                className="text-xs font-semibold bg-transparent border-none focus:outline-none text-slate-800 cursor-pointer"
+              >
+                <option value="SEMUA">Semua Kecamatan</option>
+                {districts.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    Kec. {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Pilih Desa */}
+          <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2">
+            <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             <select
               value={selectedVillage}
               onChange={(e) => setSelectedVillage(e.target.value)}
               disabled={isBidanDesa}
-              className="text-xs font-medium bg-transparent border-none focus:outline-none text-slate-800 disabled:opacity-80 cursor-pointer"
+              className="text-xs font-semibold bg-transparent border-none focus:outline-none text-slate-800 disabled:opacity-80 cursor-pointer"
             >
               {!isBidanDesa && (
                 <option value="SEMUA">
-                  {isAdminKecamatan ? 'Semua Desa (Se-Kecamatan)' : 'Semua Desa'}
+                  {isAdminKecamatan || currentUser?.district
+                    ? `Semua Desa (Kec. ${currentUser?.district || facility.district})`
+                    : 'Semua Desa (Se-Kabupaten)'}
                 </option>
               )}
               {villages.map((v) => (
                 <option key={v.id} value={v.name}>
-                  Desa {v.name}
+                  Desa {v.name}{!currentUser?.district && v.district ? ` (${v.district})` : ''}
                 </option>
               ))}
             </select>
