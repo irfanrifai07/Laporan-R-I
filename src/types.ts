@@ -151,6 +151,8 @@ export interface MonthlyF2KBCellData {
   ulangan: number;
   totalPelayanan: number; // totalBaru + gantiCara + ulangan
   apbn: number;
+  apbd: number;
+  mandiri: number;
   nonApbn: number;
   komplikasi: number;
   kegagalan: number;

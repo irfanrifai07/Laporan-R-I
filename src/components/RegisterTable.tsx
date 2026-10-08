@@ -5,6 +5,7 @@ import {
   ALOKON_KODE_OPTIONS,
   STATUS_PESERTA_KODE_LABELS,
   deriveR1KBRow,
+  exportRegisterR1KBToExcel,
 } from '../data/initialData';
 import {
   Search,
@@ -133,175 +134,16 @@ export const RegisterTable: React.FC<RegisterTableProps> = ({
       ? `Pustu ${currentUser.village}`
       : facility.name;
 
-  // Download Excel persis format 24 Kolom R/I/KB/20
+  // Download Excel persis format Cetak PDF 24 Kolom R/I/KB/20
   const handleDownloadExcel = () => {
-    const activeMonth = selectedMonth > 0 ? selectedMonth : 9;
-    const rowsHtml = filteredRecords
-      .map((r, index) => {
-        const d = deriveR1KBRow(r);
-        const nikCells = d.nikDigits
-          .map(
-            (digit) =>
-              `<td style="border:1px solid #000000; padding:3px 2px; text-align:center; font-family:Arial,sans-serif; font-size:8.5pt; width:16px;">${digit}</td>`
-          )
-          .join('');
-
-        return `
-          <tr>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${index + 1}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center; white-space:nowrap;">${d.tanggalFormatted}</td>
-            <td style="border:1px solid #000000; padding:4px;">${d.husbandName}</td>
-            ${nikCells}
-            <td style="border:1px solid #000000; padding:4px;">${d.wifeName}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center; white-space:nowrap;">${d.wifeDobFormatted}</td>
-            <td style="border:1px solid #000000; padding:4px;">${d.alamat}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center; mso-number-format:'\\@';">${d.phone}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col9}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col10}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col11}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col12}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col13}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col14}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col15}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col16}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col17}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col18}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col19}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col20}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col21}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col22}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col23}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col24}</td>
-          </tr>
-        `;
-      })
-      .join('');
-
-    const excelHtml = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="UTF-8" />
-        <!--[if gte mso 9]>
-        <xml>
-          <x:ExcelWorkbook>
-            <x:ExcelWorksheets>
-              <x:ExcelWorksheet>
-                <x:Name>REGISTER PELAYANAN KB</x:Name>
-                <x:WorksheetOptions>
-                  <x:DisplayGridlines/>
-                </x:WorksheetOptions>
-              </x:ExcelWorksheet>
-            </x:ExcelWorksheets>
-          </x:ExcelWorkbook>
-        </xml>
-        <![endif]-->
-      </head>
-      <body style="font-family:Arial,sans-serif; font-size:9pt; color:#000000;">
-        <table style="border-collapse:collapse; width:100%; margin-bottom:8px;">
-          <tr>
-            <td colspan="4" style="border:1px solid #000; padding:4px; font-size:8.5pt;">1. Petugas Entri Data</td>
-            <td colspan="28" style="text-align:center; font-size:14pt; font-weight:bold;">REGISTER PELAYANAN KB</td>
-            <td colspan="3" style="background-color:#000; color:#fff; text-align:center; font-weight:bold; padding:4px;">R/I/KB/20</td>
-            <td colspan="4" style="text-align:right; font-size:8.5pt;">Lembar <u>&nbsp;1&nbsp;</u></td>
-          </tr>
-          <tr>
-            <td colspan="6" style="font-size:9pt; padding-top:6px;">
-              NAMA FASKES/JARINGAN/JEJARING : <u>${faskesDisplayName}</u>
-            </td>
-            <td colspan="24" style="text-align:center; font-size:9pt; padding-top:6px;">
-              Kode Provinsi: <b>35</b> &nbsp;|&nbsp; Kode Kab/Kota: <b>22</b> &nbsp;|&nbsp; No. Register Faskes: <b>004</b> &nbsp;|&nbsp; No. Jaringan: <b>02</b>
-            </td>
-            <td colspan="9" style="text-align:right; font-size:9pt; padding-top:6px;">
-              Bulan: <b>${selectedMonth > 0 ? monthNames[activeMonth - 1] : 'Semua'}</b> &nbsp; Tahun: <b>${selectedYear || 2026}</b>
-            </td>
-          </tr>
-        </table>
-
-        <table style="border-collapse:collapse; width:100%; font-size:8.5pt;">
-          <thead>
-            <tr style="text-align:center; font-weight:bold;">
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">NO.</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">TANGGAL</th>
-              <th colspan="21" style="border:1px solid #000000; padding:4px;">PESERTA KB</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">STATUS PESERTA KB (Kode)</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">INFORMED CONSENT</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PASCA PERSALINAN</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PASCA KEGUGURAN</th>
-              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">JENIS TINDAKAN (Kode)</th>
-              <th colspan="2" rowspan="2" style="border:1px solid #000000; padding:4px;">Kasus (Kode)</th>
-              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">PENGGUNAAN ASURANSI</th>
-              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">SUMBER ALOKON</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PELAYANAN BERGERAK</th>
-            </tr>
-            <tr style="text-align:center; font-weight:bold;">
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">NAMA SUAMI</th>
-              <th colspan="18" style="border:1px solid #000000; padding:4px;">ISTRI</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">ALAMAT</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">NO. HANDPHONE</th>
-            </tr>
-            <tr style="text-align:center; font-weight:bold;">
-              <th colspan="16" style="border:1px solid #000000; padding:4px;">NIK (NOMOR INDUK KEPENDUDUKAN)</th>
-              <th style="border:1px solid #000000; padding:4px;">NAMA</th>
-              <th style="border:1px solid #000000; padding:4px;">TANGGAL LAHIR</th>
-              <th style="border:1px solid #000000; padding:4px;">OPERATIF / PEMBERIAN / PEMASANGAN</th>
-              <th style="border:1px solid #000000; padding:4px;">PENCABUTAN DAN PEMASANGAN</th>
-              <th style="border:1px solid #000000; padding:4px;">PENCABUTAN</th>
-              <th style="border:1px solid #000000; padding:4px;">KOMPLIKASI BERAT</th>
-              <th style="border:1px solid #000000; padding:4px;">KEGAGALAN</th>
-              <th style="border:1px solid #000000; padding:4px;">BPJS KESEHATAN</th>
-              <th style="border:1px solid #000000; padding:4px;">LAINNYA</th>
-              <th style="border:1px solid #000000; padding:4px;">TIDAK</th>
-              <th style="border:1px solid #000000; padding:4px;">APBN</th>
-              <th style="border:1px solid #000000; padding:4px;">APBD</th>
-              <th style="border:1px solid #000000; padding:4px;">MANDIRI</th>
-            </tr>
-            <tr style="text-align:center; font-size:8pt;">
-              <th style="border:1px solid #000000; padding:2px;">1</th>
-              <th style="border:1px solid #000000; padding:2px;">2</th>
-              <th style="border:1px solid #000000; padding:2px;">3</th>
-              <th colspan="16" style="border:1px solid #000000; padding:2px;">4</th>
-              <th style="border:1px solid #000000; padding:2px;">5</th>
-              <th style="border:1px solid #000000; padding:2px;">6</th>
-              <th style="border:1px solid #000000; padding:2px;">7</th>
-              <th style="border:1px solid #000000; padding:2px;">8</th>
-              <th style="border:1px solid #000000; padding:2px;">9</th>
-              <th style="border:1px solid #000000; padding:2px;">10</th>
-              <th style="border:1px solid #000000; padding:2px;">11</th>
-              <th style="border:1px solid #000000; padding:2px;">12</th>
-              <th style="border:1px solid #000000; padding:2px;">13</th>
-              <th style="border:1px solid #000000; padding:2px;">14</th>
-              <th style="border:1px solid #000000; padding:2px;">15</th>
-              <th style="border:1px solid #000000; padding:2px;">16</th>
-              <th style="border:1px solid #000000; padding:2px;">17</th>
-              <th style="border:1px solid #000000; padding:2px;">18</th>
-              <th style="border:1px solid #000000; padding:2px;">19</th>
-              <th style="border:1px solid #000000; padding:2px;">20</th>
-              <th style="border:1px solid #000000; padding:2px;">21</th>
-              <th style="border:1px solid #000000; padding:2px;">22</th>
-              <th style="border:1px solid #000000; padding:2px;">23</th>
-              <th style="border:1px solid #000000; padding:2px;">24</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob(['\uFEFF', excelHtml], {
-      type: 'application/vnd.ms-excel;charset=utf-8;',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
     const monthStr = selectedMonth > 0 ? monthNames[selectedMonth - 1] : 'Semua_Bulan';
-    link.download = `Register_RIKB20_${monthStr}_${selectedYear || 'Semua'}.xls`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    exportRegisterR1KBToExcel({
+      records: filteredRecords,
+      faskesName: faskesDisplayName,
+      selectedMonth,
+      selectedYear: selectedYear || 2026,
+      filename: `Register_RIKB20_${monthStr}_${selectedYear || 'Semua'}.xls`,
+    });
   };
 
   return (

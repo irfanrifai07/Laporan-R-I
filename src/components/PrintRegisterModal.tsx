@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { FacilityProfile, PatientRecord, Village } from '../types';
-import { deriveR1KBRow } from '../data/initialData';
+import { deriveR1KBRow, exportRegisterR1KBToExcel } from '../data/initialData';
 import { Printer, X, Download } from 'lucide-react';
 
 interface PrintRegisterModalProps {
@@ -69,111 +69,14 @@ export const PrintRegisterModal: React.FC<PrintRegisterModalProps> = ({
   };
 
   const handleDownloadExcel = () => {
-    const rowsHtml = printableRecords
-      .map((r, index) => {
-        const d = deriveR1KBRow(r);
-        const nikCells = d.nikDigits
-          .map(
-            (digit) =>
-              `<td style="border:1px solid #000000; padding:3px 2px; text-align:center; font-family:Arial,sans-serif; font-size:8.5pt; width:16px;">${digit}</td>`
-          )
-          .join('');
-
-        return `
-          <tr>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${index + 1}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center; white-space:nowrap;">${d.tanggalFormatted}</td>
-            <td style="border:1px solid #000000; padding:4px;">${d.husbandName}</td>
-            ${nikCells}
-            <td style="border:1px solid #000000; padding:4px;">${d.wifeName}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center; white-space:nowrap;">${d.wifeDobFormatted}</td>
-            <td style="border:1px solid #000000; padding:4px;">${d.alamat}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center; mso-number-format:'\\@';">${d.phone}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col9}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col10}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col11}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col12}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col13}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col14}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col15}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col16}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col17}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col18}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col19}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col20}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col21}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col22}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col23}</td>
-            <td style="border:1px solid #000000; padding:4px; text-align:center;">${d.col24}</td>
-          </tr>
-        `;
-      })
-      .join('');
-
-    const excelHtml = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="UTF-8" />
-      </head>
-      <body style="font-family:Arial,sans-serif; font-size:9pt; color:#000000;">
-        <table style="border-collapse:collapse; width:100%; font-size:8.5pt;">
-          <thead>
-            <tr style="text-align:center; font-weight:bold;">
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">NO.</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">TANGGAL</th>
-              <th colspan="21" style="border:1px solid #000000; padding:4px;">PESERTA KB</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">STATUS PESERTA KB (Kode)</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">INFORMED CONSENT</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PASCA PERSALINAN</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PASCA KEGUGURAN</th>
-              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">JENIS TINDAKAN (Kode)</th>
-              <th colspan="2" rowspan="2" style="border:1px solid #000000; padding:4px;">Kasus (Kode)</th>
-              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">PENGGUNAAN ASURANSI</th>
-              <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">SUMBER ALOKON</th>
-              <th rowspan="3" style="border:1px solid #000000; padding:4px;">PELAYANAN BERGERAK</th>
-            </tr>
-            <tr style="text-align:center; font-weight:bold;">
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">NAMA SUAMI</th>
-              <th colspan="18" style="border:1px solid #000000; padding:4px;">ISTRI</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">ALAMAT</th>
-              <th rowspan="2" style="border:1px solid #000000; padding:4px;">NO. HANDPHONE</th>
-            </tr>
-            <tr style="text-align:center; font-weight:bold;">
-              <th colspan="16" style="border:1px solid #000000; padding:4px;">NIK (NOMOR INDUK KEPENDUDUKAN)</th>
-              <th style="border:1px solid #000000; padding:4px;">NAMA</th>
-              <th style="border:1px solid #000000; padding:4px;">TANGGAL LAHIR</th>
-              <th style="border:1px solid #000000; padding:4px;">OPERATIF / PEMBERIAN / PEMASANGAN</th>
-              <th style="border:1px solid #000000; padding:4px;">PENCABUTAN DAN PEMASANGAN</th>
-              <th style="border:1px solid #000000; padding:4px;">PENCABUTAN</th>
-              <th style="border:1px solid #000000; padding:4px;">KOMPLIKASI BERAT</th>
-              <th style="border:1px solid #000000; padding:4px;">KEGAGALAN</th>
-              <th style="border:1px solid #000000; padding:4px;">BPJS KESEHATAN</th>
-              <th style="border:1px solid #000000; padding:4px;">LAINNYA</th>
-              <th style="border:1px solid #000000; padding:4px;">TIDAK</th>
-              <th style="border:1px solid #000000; padding:4px;">APBN</th>
-              <th style="border:1px solid #000000; padding:4px;">APBD</th>
-              <th style="border:1px solid #000000; padding:4px;">MANDIRI</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob(['\uFEFF', excelHtml], {
-      type: 'application/vnd.ms-excel;charset=utf-8;',
+    const monthStr = filterMonth > 0 ? monthNames[filterMonth - 1] : 'Semua_Bulan';
+    exportRegisterR1KBToExcel({
+      records: printableRecords,
+      faskesName: faskesDisplayName,
+      selectedMonth: filterMonth,
+      selectedYear: filterYear || 2026,
+      filename: `Register_RIKB20_${monthStr}_${filterYear || 2026}.xls`,
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Register_RIKB20_${filterYear || 2026}.xls`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   return (

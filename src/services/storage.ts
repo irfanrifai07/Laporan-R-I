@@ -471,6 +471,8 @@ export const StorageService = {
       let gantiCara = 0;
       let ulangan = 0;
       let apbn = 0;
+      let apbd = 0;
+      let mandiri = 0;
       let nonApbn = 0;
       let komplikasi = 0;
       let kegagalan = 0;
@@ -485,12 +487,22 @@ export const StorageService = {
         else if (rec.participantStatus === 'ULANGAN') ulangan++;
 
         // Alokon source
-        if (rec.alokonSource === 'APBN') apbn++;
-        else nonApbn++;
+        if (rec.alokonSource === 'APBN') {
+          apbn++;
+        } else if (rec.alokonSource === 'NON_APBN') {
+          apbd++;
+          nonApbn++;
+        } else {
+          mandiri++;
+          nonApbn++;
+        }
 
         // Complications
         if (rec.complications && rec.complications !== 'Tidak Ada' && rec.complications.trim() !== '') {
           komplikasi++;
+        }
+        if (rec.kasusKegagalanKode) {
+          kegagalan++;
         }
 
         // Cabut alokon
@@ -513,6 +525,8 @@ export const StorageService = {
         ulangan,
         totalPelayanan,
         apbn,
+        apbd,
+        mandiri,
         nonApbn,
         komplikasi,
         kegagalan,

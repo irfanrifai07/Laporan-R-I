@@ -240,6 +240,285 @@ export function deriveR1KBRow(r: PatientRecord) {
   };
 }
 
+export function exportRegisterR1KBToExcel(params: {
+  records: PatientRecord[];
+  faskesName: string;
+  selectedMonth: number;
+  selectedYear: number;
+  filename: string;
+}) {
+  const { records, faskesName, selectedMonth, selectedYear, filename } = params;
+  const activeMonth = selectedMonth > 0 ? selectedMonth : 9;
+  const activeYear = selectedYear || 2026;
+
+  const monthBoxRow1 = [1, 2, 3, 4, 5, 6]
+    .map(
+      (m) =>
+        `<td style="border:1px solid #000000; text-align:center; font-family:Consolas,monospace; font-size:8pt; width:18px; font-weight:${
+          activeMonth === m ? 'bold' : 'normal'
+        };">${activeMonth === m ? 'V' : m}</td>`
+    )
+    .join('');
+
+  const monthBoxRow2 = [7, 8, 9, 10, 11, 12]
+    .map(
+      (m) =>
+        `<td style="border:1px solid #000000; text-align:center; font-family:Consolas,monospace; font-size:8pt; width:18px; font-weight:${
+          activeMonth === m ? 'bold' : 'normal'
+        };">${activeMonth === m ? 'V' : m}</td>`
+    )
+    .join('');
+
+  const rowsHtml = records
+    .map((r, index) => {
+      const d = deriveR1KBRow(r);
+      const nikCells = d.nikDigits
+        .map(
+          (digit) =>
+            `<td style="border:1px solid #000000; padding:3px 1px; text-align:center; font-family:Consolas,monospace; font-size:8.5pt; width:15px; mso-number-format:'\\@';">${digit}</td>`
+        )
+        .join('');
+
+      return `
+        <tr style="height:20pt;">
+          <td style="border:1px solid #000000; padding:3px 4px; text-align:center;">${index + 1}</td>
+          <td style="border:1px solid #000000; padding:3px 5px; text-align:center; white-space:nowrap; mso-number-format:'\\@';">${d.tanggalFormatted}</td>
+          <td style="border:1px solid #000000; padding:3px 5px;">${d.husbandName}</td>
+          ${nikCells}
+          <td style="border:1px solid #000000; padding:3px 5px;">${d.wifeName}</td>
+          <td style="border:1px solid #000000; padding:3px 5px; text-align:center; white-space:nowrap; mso-number-format:'\\@';">${d.wifeDobFormatted}</td>
+          <td style="border:1px solid #000000; padding:3px 5px;">${d.alamat}</td>
+          <td style="border:1px solid #000000; padding:3px 5px; text-align:center; mso-number-format:'\\@';">${d.phone}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col9}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col10}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col11}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col12}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col13}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col14}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col15}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col16}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col17}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col18}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col19}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col20}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col21}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col22}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col23}</td>
+          <td style="border:1px solid #000000; padding:3px 2px; text-align:center;">${d.col24}</td>
+        </tr>
+      `;
+    })
+    .join('');
+
+  const vStyle =
+    'border:1px solid #000000; padding:4px 2px; text-align:center; vertical-align:bottom; mso-rotate:90; font-size:8pt; width:24px;';
+
+  const excelHtml = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta charset="UTF-8" />
+      <!--[if gte mso 9]>
+      <xml>
+        <x:ExcelWorkbook>
+          <x:ExcelWorksheets>
+            <x:ExcelWorksheet>
+              <x:Name>REGISTER PELAYANAN KB</x:Name>
+              <x:WorksheetOptions>
+                <x:DisplayGridlines/>
+                <x:Print>
+                  <x:ValidPrinterInfo/>
+                  <x:PaperSizeIndex>9</x:PaperSizeIndex>
+                </x:Print>
+              </x:WorksheetOptions>
+            </x:ExcelWorksheet>
+          </x:ExcelWorksheets>
+        </x:ExcelWorkbook>
+      </xml>
+      <![endif]-->
+      <style>
+        @page { size: landscape; margin: 0.4in; }
+        body { font-family: Arial, sans-serif; font-size: 8.5pt; color: #000000; }
+      </style>
+    </head>
+    <body>
+      <!-- KOP SURAT PERSIS CETAK PDF R/I/KB/20 -->
+      <table style="border-collapse:collapse; width:100%; margin-bottom:10px;">
+        <tr>
+          <td colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px 6px; font-size:8.5pt; vertical-align:top;">
+            1. Petugas Entri<br/>Data
+          </td>
+          <td colspan="26" style="text-align:center; font-size:14pt; font-weight:normal; letter-spacing:0.5px;">
+            REGISTER PELAYANAN KB
+          </td>
+          <td colspan="4" style="background-color:#000000; color:#ffffff; text-align:center; font-weight:bold; font-size:9pt; padding:4px;">
+            R/I/KB/20
+          </td>
+          <td colspan="6" style="text-align:right; font-size:8.5pt; vertical-align:bottom;">
+            Lembar <u>&nbsp;&nbsp;1&nbsp;&nbsp;</u>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="36" style="height:6px;"></td>
+        </tr>
+        <tr>
+          <td colspan="7" rowspan="2" style="font-size:8.5pt; vertical-align:bottom; padding-top:4px;">
+            NAMA FASKES/<br/>JARINGAN/JEJARING : <u>&nbsp;${faskesName}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>
+          </td>
+          <td colspan="6" style="text-align:right;"></td>
+          <td style="border:1px solid #000000; text-align:center; font-weight:bold; width:18px;">3</td>
+          <td style="border:1px solid #000000; text-align:center; font-weight:bold; width:18px;">5</td>
+          <td style="width:10px;"></td>
+          <td style="border:1px solid #000000; text-align:center; font-weight:bold; width:18px;">2</td>
+          <td style="border:1px solid #000000; text-align:center; font-weight:bold; width:18px;">2</td>
+          <td style="width:10px;"></td>
+          <td style="border:1px solid #000000; text-align:center; font-weight:bold; width:18px;">0</td>
+          <td style="border:1px solid #000000; text-align:center; font-weight:bold; width:18px;">0</td>
+          <td style="border:1px solid #000000; text-align:center; font-weight:bold; width:18px;">4</td>
+          <td style="width:10px;"></td>
+          <td style="border:1px solid #000000; text-align:center; font-weight:bold; width:18px;">0</td>
+          <td style="border:1px solid #000000; text-align:center; font-weight:bold; width:18px;">2</td>
+          <td colspan="4" style="text-align:right; font-size:8.5pt; vertical-align:middle; padding-right:4px;">
+            Bulan :
+          </td>
+          ${monthBoxRow1}
+          <td colspan="4" rowspan="2" style="border:1px solid #000000; text-align:center; font-weight:bold; font-size:9.5pt; vertical-align:middle;">
+            ${activeYear}
+          </td>
+        </tr>
+        <tr>
+          <td colspan="6"></td>
+          <td colspan="2" style="text-align:center; font-size:7pt; vertical-align:top;">Kode Provinsi</td>
+          <td></td>
+          <td colspan="2" style="text-align:center; font-size:7pt; vertical-align:top;">Kode<br/>Kabupaten/Kota</td>
+          <td></td>
+          <td colspan="3" style="text-align:center; font-size:7pt; vertical-align:top;">No. Register Faskes</td>
+          <td></td>
+          <td colspan="2" style="text-align:center; font-size:7pt; vertical-align:top;">No. Jaringan/<br/>Jejaring Faskes</td>
+          <td colspan="4"></td>
+          ${monthBoxRow2}
+        </tr>
+      </table>
+
+      <!-- TABEL UTAMA 24 KOLOM R/I/KB/20 PERSIS CETAK PDF -->
+      <table style="border-collapse:collapse; width:100%; font-size:8.5pt;">
+        <thead>
+          <tr style="text-align:center; font-weight:normal;">
+            <th rowspan="3" style="border:1px solid #000000; padding:4px; width:26px;">NO.</th>
+            <th rowspan="3" style="border:1px solid #000000; padding:4px; width:72px;">TANGGAL</th>
+            <th colspan="21" style="border:1px solid #000000; padding:4px;">PESERTA KB</th>
+            <th rowspan="3" style="${vStyle}">STATUS PESERTA KB (Kode)</th>
+            <th rowspan="3" style="${vStyle}">INFORMED CONSENT</th>
+            <th rowspan="3" style="${vStyle}">PASCA PERSALINAN</th>
+            <th rowspan="3" style="${vStyle}">PASCA KEGUGURAN</th>
+            <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">JENIS TINDAKAN<br/>(Kode)</th>
+            <th colspan="2" rowspan="2" style="border:1px solid #000000; padding:4px;">Kasus<br/>(Kode)</th>
+            <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">PENGGUNAAN<br/>ASURANSI</th>
+            <th colspan="3" rowspan="2" style="border:1px solid #000000; padding:4px;">SUMBER ALOKON</th>
+            <th rowspan="3" style="${vStyle}">PELAYANAN BERGERAK</th>
+          </tr>
+          <tr style="text-align:center; font-weight:normal;">
+            <th rowspan="2" style="border:1px solid #000000; padding:4px; width:115px;">NAMA SUAMI</th>
+            <th colspan="18" style="border:1px solid #000000; padding:4px;">ISTRI</th>
+            <th rowspan="2" style="border:1px solid #000000; padding:4px; width:115px;">ALAMAT</th>
+            <th rowspan="2" style="border:1px solid #000000; padding:4px; width:90px;">NO. HANDPHONE</th>
+          </tr>
+          <tr style="text-align:center; font-weight:normal; height:95pt;">
+            <th colspan="16" style="border:1px solid #000000; padding:4px; vertical-align:middle;">NIK (NOMOR INDUK KEPENDUDUKAN)</th>
+            <th style="border:1px solid #000000; padding:4px; width:115px; vertical-align:middle;">NAMA</th>
+            <th style="border:1px solid #000000; padding:4px; width:72px; vertical-align:middle;">TANGGAL<br/>LAHIR</th>
+            <th style="${vStyle}">OPERATIF / PEMBERIAN / PEMASANGAN</th>
+            <th style="${vStyle}">PENCABUTAN DAN PEMASANGAN</th>
+            <th style="${vStyle}">PENCABUTAN</th>
+            <th style="${vStyle}">KOMPLIKASI BERAT</th>
+            <th style="${vStyle}">KEGAGALAN</th>
+            <th style="${vStyle}">BPJS KESEHATAN</th>
+            <th style="${vStyle}">LAINNYA</th>
+            <th style="${vStyle}">TIDAK</th>
+            <th style="${vStyle}">APBN</th>
+            <th style="${vStyle}">APBD</th>
+            <th style="${vStyle}">MANDIRI</th>
+          </tr>
+          <tr style="text-align:center; font-size:8pt;">
+            <th style="border:1px solid #000000; padding:2px;">1</th>
+            <th style="border:1px solid #000000; padding:2px;">2</th>
+            <th style="border:1px solid #000000; padding:2px;">3</th>
+            <th colspan="16" style="border:1px solid #000000; padding:2px;">4</th>
+            <th style="border:1px solid #000000; padding:2px;">5</th>
+            <th style="border:1px solid #000000; padding:2px;">6</th>
+            <th style="border:1px solid #000000; padding:2px;">7</th>
+            <th style="border:1px solid #000000; padding:2px;">8</th>
+            <th style="border:1px solid #000000; padding:2px;">9</th>
+            <th style="border:1px solid #000000; padding:2px;">10</th>
+            <th style="border:1px solid #000000; padding:2px;">11</th>
+            <th style="border:1px solid #000000; padding:2px;">12</th>
+            <th style="border:1px solid #000000; padding:2px;">13</th>
+            <th style="border:1px solid #000000; padding:2px;">14</th>
+            <th style="border:1px solid #000000; padding:2px;">15</th>
+            <th style="border:1px solid #000000; padding:2px;">16</th>
+            <th style="border:1px solid #000000; padding:2px;">17</th>
+            <th style="border:1px solid #000000; padding:2px;">18</th>
+            <th style="border:1px solid #000000; padding:2px;">19</th>
+            <th style="border:1px solid #000000; padding:2px;">20</th>
+            <th style="border:1px solid #000000; padding:2px;">21</th>
+            <th style="border:1px solid #000000; padding:2px;">22</th>
+            <th style="border:1px solid #000000; padding:2px;">23</th>
+            <th style="border:1px solid #000000; padding:2px;">24</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <!-- KETERANGAN KODE BAWAH PERSIS CETAK PDF -->
+      <table style="border-collapse:collapse; margin-top:10px; font-size:8pt;">
+        <tr>
+          <td colspan="30" style="padding:4px 0; font-weight:normal;">1) Keterangan Kode</td>
+        </tr>
+        <tr>
+          <td colspan="8" style="border:1px solid #000000; text-align:center; padding:3px;">STATUS PESERTA KB</td>
+          <td colspan="22" style="border:1px solid #000000; text-align:center; padding:3px;">KODE JENIS ALOKON (Diisi Pada Jenis Tindakan dan Kasus)</td>
+        </tr>
+        <tr>
+          <td colspan="4" style="border-left:1px solid #000000; padding:2px 6px;">1 : Peserta KB Baru</td>
+          <td colspan="4" style="border-right:1px solid #000000; padding:2px 6px;">3 : Peserta KB Ulangan</td>
+          <td colspan="4" style="padding:2px 6px;">1 : Suntikan 1 Bulanan</td>
+          <td colspan="4" style="padding:2px 6px;">3 : Suntikan 3 Bulanan</td>
+          <td colspan="4" style="padding:2px 6px;">5 : Pil Progestin</td>
+          <td colspan="4" style="padding:2px 6px;">7 : Implan 1 Batang</td>
+          <td colspan="3" style="padding:2px 6px;">9 : IUD</td>
+          <td colspan="3" style="border-right:1px solid #000000; padding:2px 6px;">11 : Tubektomi</td>
+        </tr>
+        <tr>
+          <td colspan="4" style="border-left:1px solid #000000; border-bottom:1px solid #000000; padding:2px 6px;">2 : Peserta KB Ganti</td>
+          <td colspan="4" style="border-right:1px solid #000000; border-bottom:1px solid #000000; padding:2px 6px;">4 : Komplikasi</td>
+          <td colspan="4" style="border-bottom:1px solid #000000; padding:2px 6px;">2 : Suntikan 3 Bulanan</td>
+          <td colspan="4" style="border-bottom:1px solid #000000; padding:2px 6px;">4 : Pil Kombinasi</td>
+          <td colspan="4" style="border-bottom:1px solid #000000; padding:2px 6px;">6 : Kondom</td>
+          <td colspan="4" style="border-bottom:1px solid #000000; padding:2px 6px;">8 : Implan 2 Batang</td>
+          <td colspan="6" style="border-right:1px solid #000000; border-bottom:1px solid #000000; padding:2px 6px;">10 : Vasektomi</td>
+        </tr>
+        <tr>
+          <td colspan="30" style="padding-top:6px;">2) SELAIN STATUS PESERTA KB, JENIS TINDAKAN DAN KASUS DIISI TANDA CENTANG (V)</td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const blob = new Blob(['\uFEFF', excelHtml], {
+    type: 'application/vnd.ms-excel;charset=utf-8;',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export const initialFacilityProfile: FacilityProfile = {
   name: 'DINAS PEMBERDAYAAN PEREMPUAN, PERLINDUNGAN ANAK DAN KB KABUPATEN BOJONEGORO',
   code: '35220000',
