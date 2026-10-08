@@ -129,27 +129,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               })}
             </nav>
 
-            {/* Right Controls: District Filter & User Profile */}
+            {/* Right Controls: User Profile */}
             <div className="flex items-center space-x-2">
-              {(currentUser?.role === 'admin_induk' || currentUser?.role === 'admin_kabupaten') && (
-                <div className="hidden lg:flex items-center space-x-1.5 bg-slate-50 hover:bg-slate-100/80 px-3 py-1.5 rounded-xl border border-slate-200/80 text-slate-700 transition">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <select
-                    value={currentUser.district || 'SEMUA'}
-                    onChange={(e) => onSelectDistrict && onSelectDistrict(e.target.value)}
-                    className="bg-transparent text-slate-800 font-semibold text-xs focus:outline-none cursor-pointer max-w-[150px] truncate"
-                    title="Pilih Kecamatan yang Ingin Diawasi / Dikelola"
-                  >
-                    <option value="SEMUA">Semua Kecamatan</option>
-                    {districts.map((d) => (
-                      <option key={d.id} value={d.name}>
-                        Kec. {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
               {currentUser ? (
                 <div className="flex items-center space-x-1.5">
                   <button
@@ -220,27 +201,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   Ganti Akun
                 </button>
-              </div>
-            )}
-
-            {(currentUser?.role === 'admin_induk' || currentUser?.role === 'admin_kabupaten') && (
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-600">Wilayah Kecamatan:</span>
-                <select
-                  value={currentUser.district || 'SEMUA'}
-                  onChange={(e) => {
-                    if (onSelectDistrict) onSelectDistrict(e.target.value);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800"
-                >
-                  <option value="SEMUA">Semua Kecamatan</option>
-                  {districts.map((d) => (
-                    <option key={d.id} value={d.name}>
-                      Kec. {d.name}
-                    </option>
-                  ))}
-                </select>
               </div>
             )}
 
