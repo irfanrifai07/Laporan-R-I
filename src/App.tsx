@@ -10,6 +10,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { RegisterFormModal } from './components/RegisterFormModal';
 import { PrintRegisterModal } from './components/PrintRegisterModal';
 import { LoginModal } from './components/LoginModal';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { CheckCircle2, ShieldCheck, Heart, Shield } from 'lucide-react';
 
 export default function App() {
@@ -53,6 +54,7 @@ export default function App() {
   const [formEditData, setFormEditData] = useState<PatientRecord | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -337,6 +339,7 @@ export default function App() {
         districts={districts}
         onSelectDistrict={handleSelectDistrict}
         onOpenLogin={() => setIsLoginModalOpen(true)}
+        onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -493,6 +496,28 @@ export default function App() {
           }}
         />
       )}
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        targetUser={currentUser}
+        onClose={() => setIsChangePasswordOpen(false)}
+        onConfirmChange={(target, newPwd) => {
+          const updatedUser: User = { ...target, password: newPwd };
+          const updatedList = users.map((u) => (u.id === target.id ? updatedUser : u));
+          setUsers(updatedList);
+          StorageService.saveSingleUser(updatedUser);
+          if (currentUser?.id === target.id) {
+            setCurrentUser(updatedUser);
+            StorageService.setCurrentUser(updatedUser);
+          }
+          StorageService.logActivity(
+            currentUser?.username || target.username,
+            'UBAH_PASSWORD',
+            `Mengubah password akun ${target.name} (@${target.username})`
+          );
+          showToast(`✓ Password akun ${target.name} berhasil diperbarui!`);
+        }}
+      />
     </div>
   );
 }

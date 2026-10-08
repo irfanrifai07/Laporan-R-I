@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ActivityLog, District, FacilityProfile, Role, User, Village } from '../types';
 import { StorageService } from '../services/storage';
 import { FirestoreService } from '../services/firebase';
+import { ChangePasswordModal } from './ChangePasswordModal';
 import {
   Building2,
   MapPin,
@@ -764,15 +765,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  // Reset Password
+  // Reset Password Modal state
+  const [passwordModalUser, setPasswordModalUser] = useState<User | null>(null);
+
   const handleResetPassword = (u: User) => {
-    const newPwd = prompt(`Masukkan kata sandi baru untuk ${u.name}:`, '123');
-    if (newPwd !== null && newPwd.trim()) {
-      const updated = users.map((usr) => (usr.id === u.id ? { ...usr, password: newPwd.trim() } : usr));
-      onUpdateUsers(updated);
-      StorageService.saveUsers(updated);
-      alert(`Password untuk ${u.name} berhasil diubah.`);
+    setPasswordModalUser(u);
+  };
+
+  const handleConfirmPasswordChange = (u: User, newPwd: string) => {
+    const updatedUser: User = { ...u, password: newPwd };
+    const updated = users.map((usr) => (usr.id === u.id ? updatedUser : usr));
+    onUpdateUsers(updated);
+    StorageService.saveSingleUser(updatedUser);
+    if (currentUser?.id === updatedUser.id) {
+      StorageService.setCurrentUser(updatedUser);
     }
+    StorageService.logActivity(
+      currentUser?.username || 'admin',
+      'UBAH_PASSWORD',
+      `Mengubah kata sandi untuk akun ${u.name} (@${u.username})`
+    );
+    setStatusMessage({
+      text: `✓ Kata sandi untuk ${u.name} (@${u.username}) berhasil diperbarui!`,
+      type: 'success',
+    });
+    setTimeout(() => setStatusMessage(null), 3500);
   };
 
   // Backup Download
@@ -2003,9 +2020,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     )}
                     <button
                       onClick={() => handleResetPassword(u)}
-                      className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium flex items-center space-x-1 cursor-pointer transition"
+                      className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-200 border border-transparent text-slate-700 rounded-lg font-medium flex items-center space-x-1 cursor-pointer transition group"
                     >
-                      <KeyRound className="w-3.5 h-3.5" />
+                      <KeyRound className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-12" />
                       <span>Ubah Password</span>
                     </button>
                     {u.username !== 'admin' && (isSuperAdmin || u.role === 'bidan_desa') && (
@@ -2699,6 +2716,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
       )}
+
+      <ChangePasswordModal
+        isOpen={Boolean(passwordModalUser)}
+        targetUser={passwordModalUser}
+        onClose={() => setPasswordModalUser(null)}
+        onConfirmChange={handleConfirmPasswordChange}
+      />
     </div>
   );
 };
